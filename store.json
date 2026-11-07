@@ -1,0 +1,29 @@
+{
+  "products": [
+    {
+      "id": "P-RICE-001",
+      "name": "चावल",
+      "unit": "kg",
+      "price": 40,
+      "stock": 100,
+      "active": true
+    },
+    {
+      "id": "P-FLOUR-001",
+      "name": "आटा",
+      "unit": "kg",
+      "price": 35,
+      "stock": 100,
+      "active": true
+    },
+    {
+      "id": "P-OIL-001",
+      "name": "सरसों तेल",
+      "unit": "litre",
+      "price": 150,
+      "stock": 50,
+      "active": true
+    }
+  ],
+  "orders": []
+}
