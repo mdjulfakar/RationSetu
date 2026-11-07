@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "RationSetu",
+    "slug": "rationsetu",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "in.rationsetu.app"
+    }
+  }
+}
