@@ -1,18 +1,15 @@
 {
-  "name": "rationsetu",
+  "name": "rationsetu-store-api",
   "version": "1.0.0",
   "private": true,
-  "main": "node_modules/expo/AppEntry.js",
+  "description": "RationSetu store, product, order and admin API starter",
+  "main": "src/server.js",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "web": "expo start --web"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
   },
   "dependencies": {
-    "@react-native-async-storage/async-storage": "2.1.0",
-    "expo": "~52.0.0",
-    "expo-status-bar": "~2.0.1",
-    "react": "18.3.1",
-    "react-native": "0.76.5"
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
   }
 }
