@@ -1,19 +1,36 @@
-# RationSetu – राशन सेतु
+# RationSetu – Source v2 (Store & Orders API)
 
-Expo React Native Android app starter for the RationSetu shop in Jatwara, Kursakanta, Araria, Bihar.
+यह दूसरी ZIP, पहली RationSetu source ZIP की पूरक backend/API फाइल है।
 
-## Included
-- Hindi customer catalog, search, cart and Cash on Delivery order form
-- Customer order history on the same device
-- Shop admin panel: view orders, update status, add products, edit shop details
-- Local persistence with AsyncStorage
-- Initial 15 km service-area label
+## इसमें क्या है
+- दुकान के products और prices देखने का API
+- Admin key से product जोड़ने और अपडेट करने का API
+- ग्राहक का COD order दर्ज करना
+- Admin द्वारा orders देखना और status बदलना
+- शुरुआती demo data: चावल, आटा और सरसों तेल
 
-## Run
-1. Install Node.js and npm on a computer or cloud development environment.
-2. Run `npm install`
-3. Run `npx expo start`
-4. Use Expo Go for preview, or configure an Android build with EAS.
+## चलाने के लिए
+Node.js 18 या नया संस्करण चाहिए।
 
-## Important deployment limitation
-This package is a functional local prototype. Data is stored on the device. Customer orders created on a customer's separate phone will NOT automatically appear on the shop owner's phone until a hosted backend/API and authentication are configured. Do not use this as a live multi-customer ordering service yet. The next deliverable should add a secure backend, owner authentication, shared product/order database, and deployment configuration. No Firebase or connected account is used in this package.
+```bash
+npm install
+ADMIN_KEY="अपनी-मजबूत-कुंजी" npm start
+```
+
+डिफ़ॉल्ट local address: `http://localhost:3000`
+
+## मुख्य endpoints
+- `GET /api/health`
+- `GET /api/products`
+- `POST /api/orders`
+- `POST /api/admin/products` (header: `x-admin-key`)
+- `PATCH /api/admin/products/:id` (header: `x-admin-key`)
+- `GET /api/admin/orders` (header: `x-admin-key`)
+- `PATCH /api/admin/orders/:id/status` (header: `x-admin-key`)
+
+## जरूरी सीमा
+यह अभी source-code starter है, production-ready hosting, secure user login,
+database backup, payment gateway, delivery tracking या Android app से जुड़ा
+पूरा integration इसमें शामिल नहीं है। इसे पहली ZIP के साथ जोड़कर अगली integration
+फाइल में Android app से connect किया जाएगा। Production में ADMIN_KEY को सुरक्षित
+environment secret से बदलना अनिवार्य है।
