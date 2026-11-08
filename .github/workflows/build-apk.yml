@@ -1,5 +1,4 @@
-
-name: Build RationSetu APK
+name: Build RationSetu Release APK
 
 on:
   workflow_dispatch:
@@ -12,18 +11,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install dependencies
-        run: |
-          npm install
-          npm install expo@~52.0.46 react@18.3.1 react-native@0.76.9 @react-native-async-storage/async-storage@2.1.2
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -31,18 +25,21 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Generate Android project
-        run: |
-          npx expo prebuild --platform android --no-install
+      - name: Install Dependencies
+        run: npm install
 
-      - name: Build APK
+      - name: Generate Android Project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build Release APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
-      - name: Upload APK
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: RationSetu-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: RationSetu-Release-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
