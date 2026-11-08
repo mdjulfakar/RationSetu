@@ -1,15 +1,18 @@
+
 {
-  "name": "rationsetu-store-api",
+  "name": "rationsetu",
   "version": "1.0.0",
   "private": true,
-  "description": "RationSetu store, product, order and admin API starter",
-  "main": "src/server.js",
+  "description": "RationSetu Supabase Backend",
+  "main": "server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.57.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2"
   }
 }
