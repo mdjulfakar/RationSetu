@@ -5,9 +5,10 @@
   "description": "RationSetu Android App and Backend",
   "main": "expo/AppEntry",
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "server": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "start:app": "expo start",
+    "android": "expo run:android"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",
