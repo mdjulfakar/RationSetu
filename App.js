@@ -9,8 +9,10 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 
 const API_BASE_URL = 'https://rationsetu-service.onrender.com';
 const KEY = 'rationsetu_v1';
@@ -100,6 +102,11 @@ const translations = {
     orderUpdated: 'ऑर्डर की स्थिति अपडेट हो गई।',
     updateFailed: 'अपडेट असफल',
     productInfo: 'सामान, कीमत और स्टॉक भरें।',
+    productImage: 'सामान की फोटो',
+    choosePhoto: 'फोन से फोटो चुनें',
+    replacePhoto: 'फोटो बदलें',
+    uploadFailed: 'फोटो अपलोड नहीं हो पाई।',
+    photoUploaded: 'फोटो सेव हो गई।',
     wrongInfo: 'गलत जानकारी',
     priceStockError: 'कीमत और स्टॉक सही भरें।',
     productNotAdded: 'सामान नहीं जुड़ पाया।',
@@ -189,6 +196,11 @@ const translations = {
     orderUpdated: 'Order status updated.',
     updateFailed: 'Update failed',
     productInfo: 'Enter product name, price and stock.',
+    productImage: 'Product photo',
+    choosePhoto: 'Choose photo from phone',
+    replacePhoto: 'Change photo',
+    uploadFailed: 'Photo upload failed.',
+    photoUploaded: 'Photo saved.',
     wrongInfo: 'Invalid information',
     priceStockError: 'Enter a valid price and stock.',
     productNotAdded: 'Product could not be added.',
@@ -293,6 +305,8 @@ export default function App() {
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
   const [newStock, setNewStock] = useState('');
+  const [newImage, setNewImage] = useState(null);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState('');
 
   const [adminId, setAdminId] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
@@ -627,6 +641,72 @@ export default function App() {
     }
   }
 
+  // Choose a product photo from the phone gallery.
+  async function chooseProductImage() {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          t('productImage'),
+          language === 'en'
+            ? 'Allow photo-library access to choose a product image.'
+            : 'सामान की फोटो चुनने के लिए गैलरी की अनुमति दें।',
+        );
+        return null;
+      }
+
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (picked.canceled || !picked.assets?.length) return null;
+      return picked.assets[0];
+    } catch (error) {
+      Alert.alert(t('productImage'), error.message || t('uploadFailed'));
+      return null;
+    }
+  }
+
+  async function selectNewProductImage() {
+    const photo = await chooseProductImage();
+    if (photo) setNewImage(photo);
+  }
+
+  // Upload selected image through the protected backend endpoint.
+  async function uploadProductImage(photo) {
+    if (!photo?.uri) throw new Error(t('uploadFailed'));
+
+    const form = new FormData();
+    form.append('file', {
+      uri: photo.uri,
+      name: photo.fileName || `product-${Date.now()}.jpg`,
+      type: photo.mimeType || 'image/jpeg',
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/products/upload-image`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: form,
+      },
+    );
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || result.error || t('uploadFailed'));
+    }
+
+    const imageUrl = result.image_url || result.url;
+    if (!imageUrl) throw new Error(t('uploadFailed'));
+    return imageUrl;
+  }
+
   // Add product through backend.
   async function addProduct() {
     if (!newName.trim() || !newPrice.trim() || !newStock.trim()) {
@@ -650,6 +730,7 @@ export default function App() {
     setLoading(true);
 
     try {
+      const imageUrl = newImage ? await uploadProductImage(newImage) : null;
       const result = await apiRequest(
         '/api/admin/products',
         {
@@ -658,6 +739,7 @@ export default function App() {
             name: newName.trim(),
             price,
             stock,
+            image_url: imageUrl,
           }),
         },
         adminToken,
@@ -678,12 +760,53 @@ export default function App() {
       setNewName('');
       setNewPrice('');
       setNewStock('');
+      setNewImage(null);
 
       Alert.alert(t('success'), t('productAdded'));
     } catch (error) {
       Alert.alert(t('productAddFailed'), error.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Add or replace the photo for an existing product.
+  async function replaceProductImage(product) {
+    if (loading || uploadingPhotoId) return;
+
+    const photo = await chooseProductImage();
+    if (!photo) return;
+
+    setUploadingPhotoId(product.id);
+    try {
+      const imageUrl = await uploadProductImage(photo);
+      const result = await apiRequest(
+        `/api/admin/products/${encodeURIComponent(product.id)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({image_url: imageUrl}),
+        },
+        adminToken,
+      );
+
+      if (!result.success) {
+        throw new Error(result.message || t('uploadFailed'));
+      }
+
+      setData(previous => ({
+        ...previous,
+        products: previous.products.map(item =>
+          item.id === product.id
+            ? {...item, image_url: imageUrl}
+            : item,
+        ),
+      }));
+
+      Alert.alert(t('success'), t('photoUploaded'));
+    } catch (error) {
+      Alert.alert(t('uploadFailed'), error.message);
+    } finally {
+      setUploadingPhotoId('');
     }
   }
 
@@ -725,6 +848,9 @@ export default function App() {
 
           {items.map(product => (
             <View key={product.id} style={styles.row}>
+              {product.image_url ? (
+                <Image source={{uri: product.image_url}} style={styles.productImage} />
+              ) : null}
               <View style={{flex: 1}}>
                 <Text style={styles.item}>{productLabel(product)}</Text>
                 <Text style={styles.muted}>
@@ -828,8 +954,33 @@ export default function App() {
           {field(newName, setNewName, t('productName'))}
           {field(newPrice, setNewPrice, t('price'), 'numeric')}
           {field(newStock, setNewStock, t('stock'), 'numeric')}
+          {newImage ? (
+            <Image source={{uri: newImage.uri}} style={styles.imagePreview} />
+          ) : null}
+          {button(t('choosePhoto'), selectNewProductImage, false, loading)}
 
           {button(t('addProduct'), addProduct, true, loading)}
+
+          <Text style={styles.item}>{t('productImage')} · {t('replacePhoto')}</Text>
+          {data.products.map(product => (
+            <View key={product.id} style={styles.card}>
+              <View style={styles.productAdminRow}>
+                {product.image_url ? (
+                  <Image source={{uri: product.image_url}} style={styles.productImage} />
+                ) : null}
+                <View style={{flex: 1}}>
+                  <Text style={styles.item}>{productLabel(product)}</Text>
+                  <Text style={styles.muted}>{money(product.price)} · {t('stock')}: {product.stock}</Text>
+                  {button(
+                    uploadingPhotoId === product.id ? t('wait') : t('replacePhoto'),
+                    () => replaceProductImage(product),
+                    false,
+                    loading || !!uploadingPhotoId,
+                  )}
+                </View>
+              </View>
+            </View>
+          ))}
 
           <Text style={styles.title}>{t('allOrders')}</Text>
 
@@ -1003,6 +1154,24 @@ const styles = StyleSheet.create({
   muted: {
     color: '#68756c',
     marginBottom: 8,
+  },
+  productImage: {
+    width: 76,
+    height: 76,
+    borderRadius: 8,
+    marginRight: 10,
+    backgroundColor: '#e3e9e4',
+  },
+  imagePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: 10,
+    marginVertical: 8,
+    backgroundColor: '#e3e9e4',
+  },
+  productAdminRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   row: {
     flexDirection: 'row',
