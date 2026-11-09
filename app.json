@@ -1,5 +1,4 @@
 
-
 {
   "expo": {
     "name": "RationSetu",
@@ -7,13 +6,8 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/rationsetu-icon.png",
     "android": {
-      "package": "in.rationsetu.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/rationsetu-icon.png",
-        "backgroundColor": "#FFFFFF"
-      }
+      "package": "in.rationsetu.app"
     },
     "plugins": [
       [
@@ -27,3 +21,4 @@
     ]
   }
 }
+
