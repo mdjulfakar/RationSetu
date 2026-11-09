@@ -1,4 +1,3 @@
-
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
@@ -15,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = 'https://rationsetu-service.onrender.com';
 const KEY = 'rationsetu_v1';
+const LANGUAGE_KEY = 'rationsetu_language';
 
 const initialProducts = [
   {id: 'p1', name: 'चावल', unit: 'किलो', price: 38, stock: 500},
@@ -24,6 +24,196 @@ const initialProducts = [
   {id: 'p5', name: 'सरसों तेल', unit: 'लीटर', price: 145, stock: 80},
   {id: 'p6', name: 'दाल', unit: 'किलो', price: 110, stock: 100},
 ];
+
+const translations = {
+  hi: {
+    tagline: 'आपका राशन, आपके घर तक!',
+    serverCheck: '⚠️ सर्वर कनेक्शन जाँचें',
+    online: '🟢 ऑनलाइन सेवा',
+    home: 'होम',
+    myOrders: 'मेरे ऑर्डर',
+    shopAdmin: 'दुकान एडमिन',
+    settings: 'सेटिंग्स',
+    language: 'भाषा',
+    chooseLanguage: 'अपनी पसंद की भाषा चुनें',
+    hindi: 'हिन्दी',
+    english: 'English',
+    savedLanguage: 'भाषा सेव हो गई।',
+    wait: 'कृपया इंतजार करें...',
+    orderTitle: 'राशन और किराना ऑर्डर करें',
+    serviceArea: 'सेवा क्षेत्र: जटवारा और आसपास, शुरुआती 15 km',
+    search: 'सामान खोजें',
+    available: 'उपलब्ध',
+    noProduct: 'कोई सामान नहीं मिला।',
+    deliveryInfo: 'डिलीवरी की जानकारी',
+    customerName: 'ग्राहक का नाम',
+    mobile: '10 अंकों का मोबाइल नंबर',
+    fullAddress: 'पूरा घर का पता',
+    total: 'कुल',
+    paymentCod: 'भुगतान: सामान मिलने पर नकद (COD)',
+    sendOrder: 'COD ऑर्डर भेजें',
+    orderSuccess: 'ऑर्डर सफलतापूर्वक भेज दिया गया!',
+    orderSaved: 'आपका ऑर्डर ऑनलाइन दुकान के सर्वर पर सेव हो गया है।',
+    goHome: 'होम पर जाएँ',
+    seeOrders: 'मेरे ऑर्डर देखें',
+    noOrderForPhone: 'इस फोन में इस मोबाइल नंबर का कोई ऑर्डर रिकॉर्ड नहीं मिला।',
+    adminLogin: 'दुकान एडमिन लॉगिन',
+    adminId: 'Admin ID',
+    adminPassword: 'Admin Password',
+    adminPanel: 'दुकान एडमिन पैनल',
+    orderCount: 'कुल ऑर्डर',
+    refreshOrders: 'ऑर्डर रिफ्रेश करें',
+    addProductTitle: 'नया सामान जोड़ें',
+    productName: 'सामान का नाम',
+    price: 'कीमत ₹',
+    stock: 'स्टॉक',
+    addProduct: 'सामान जोड़ें',
+    allOrders: 'सभी ऑनलाइन ऑर्डर',
+    noOrders: 'अभी कोई ऑर्डर नहीं आया है।',
+    status: 'स्थिति',
+    accept: 'ऑर्डर स्वीकार करें',
+    delivered: 'डिलीवरी पूरी',
+    cancel: 'ऑर्डर रद्द करें',
+    shopInfo: 'दुकान की जानकारी',
+    shopName: 'दुकान का नाम',
+    shopPhone: 'दुकान मोबाइल नंबर',
+    shopAddress: 'दुकान का पता',
+    logout: 'Admin Logout',
+    infoIncomplete: 'जानकारी अधूरी',
+    fillName: 'कृपया ग्राहक का नाम भरें।',
+    wrongMobile: 'मोबाइल नंबर गलत',
+    fillMobile: '10 अंकों का मोबाइल नंबर भरें।',
+    addressIncomplete: 'पता अधूरा',
+    fillAddress: 'पूरा घर का पता भरें।',
+    noItem: 'सामान नहीं चुना',
+    chooseItem: 'कम से कम एक सामान चुनें।',
+    orderNotSaved: 'ऑर्डर सेव नहीं हुआ।',
+    orderSuccessTitle: '✅ ऑर्डर सफल!',
+    orderServerSuccess: 'आपका ऑर्डर दुकान के सर्वर पर सफलतापूर्वक पहुँच गया है।',
+    orderFailed: 'ऑर्डर नहीं हुआ',
+    adminInfo: 'Admin ID और Password भरें।',
+    adminFailed: 'Admin login असफल हुआ।',
+    adminError: 'Admin Login Error',
+    success: '✅ सफल',
+    adminLoginSuccess: 'Admin Login सफल हो गया।',
+    ordersNotLoaded: 'ऑर्डर लोड नहीं हुए',
+    orderUpdated: 'ऑर्डर की स्थिति अपडेट हो गई।',
+    updateFailed: 'अपडेट असफल',
+    productInfo: 'सामान, कीमत और स्टॉक भरें।',
+    wrongInfo: 'गलत जानकारी',
+    priceStockError: 'कीमत और स्टॉक सही भरें।',
+    productNotAdded: 'सामान नहीं जुड़ पाया।',
+    productAdded: 'नया सामान सर्वर पर जुड़ गया।',
+    productAddFailed: 'सामान नहीं जुड़ा',
+    logoutSuccess: 'Admin Logout हो गया।',
+    internetError: 'इंटरनेट कनेक्शन नहीं मिला। कृपया दोबारा कोशिश करें।',
+    serverConnection: 'सर्वर कनेक्शन',
+    kilo: 'किलो',
+    litre: 'लीटर',
+    pending: 'लंबित',
+    accepted: 'स्वीकार किया गया',
+    deliveredStatus: 'डिलीवर हो गया',
+    cancelled: 'रद्द',
+  },
+  en: {
+    tagline: 'Your groceries, delivered to your home!',
+    serverCheck: '⚠️ Check server connection',
+    online: '🟢 Online service',
+    home: 'Home',
+    myOrders: 'My Orders',
+    shopAdmin: 'Shop Admin',
+    settings: 'Settings',
+    language: 'Language',
+    chooseLanguage: 'Choose your preferred language',
+    hindi: 'हिन्दी',
+    english: 'English',
+    savedLanguage: 'Language preference saved.',
+    wait: 'Please wait...',
+    orderTitle: 'Order groceries and essentials',
+    serviceArea: 'Service area: Jatwara and nearby, initial 15 km',
+    search: 'Search products',
+    available: 'Available',
+    noProduct: 'No products found.',
+    deliveryInfo: 'Delivery Information',
+    customerName: 'Customer name',
+    mobile: '10-digit mobile number',
+    fullAddress: 'Full home address',
+    total: 'Total',
+    paymentCod: 'Payment: Cash on Delivery (COD)',
+    sendOrder: 'Place COD Order',
+    orderSuccess: 'Order placed successfully!',
+    orderSaved: 'Your order has been saved on the online shop server.',
+    goHome: 'Go to Home',
+    seeOrders: 'View My Orders',
+    noOrderForPhone: 'No order record found for this mobile number on this phone.',
+    adminLogin: 'Shop Admin Login',
+    adminId: 'Admin ID',
+    adminPassword: 'Admin Password',
+    adminPanel: 'Shop Admin Panel',
+    orderCount: 'Total orders',
+    refreshOrders: 'Refresh Orders',
+    addProductTitle: 'Add New Product',
+    productName: 'Product name',
+    price: 'Price ₹',
+    stock: 'Stock',
+    addProduct: 'Add Product',
+    allOrders: 'All Online Orders',
+    noOrders: 'No orders have arrived yet.',
+    status: 'Status',
+    accept: 'Accept Order',
+    delivered: 'Mark Delivered',
+    cancel: 'Cancel Order',
+    shopInfo: 'Shop Information',
+    shopName: 'Shop name',
+    shopPhone: 'Shop mobile number',
+    shopAddress: 'Shop address',
+    logout: 'Admin Logout',
+    infoIncomplete: 'Missing information',
+    fillName: 'Please enter the customer name.',
+    wrongMobile: 'Invalid mobile number',
+    fillMobile: 'Enter a 10-digit mobile number.',
+    addressIncomplete: 'Address incomplete',
+    fillAddress: 'Enter the complete home address.',
+    noItem: 'No product selected',
+    chooseItem: 'Please select at least one product.',
+    orderNotSaved: 'Order could not be saved.',
+    orderSuccessTitle: '✅ Order successful!',
+    orderServerSuccess: 'Your order has reached the shop server successfully.',
+    orderFailed: 'Order failed',
+    adminInfo: 'Enter Admin ID and Password.',
+    adminFailed: 'Admin login failed.',
+    adminError: 'Admin Login Error',
+    success: '✅ Success',
+    adminLoginSuccess: 'Admin login successful.',
+    ordersNotLoaded: 'Could not load orders',
+    orderUpdated: 'Order status updated.',
+    updateFailed: 'Update failed',
+    productInfo: 'Enter product name, price and stock.',
+    wrongInfo: 'Invalid information',
+    priceStockError: 'Enter a valid price and stock.',
+    productNotAdded: 'Product could not be added.',
+    productAdded: 'New product added to the server.',
+    productAddFailed: 'Could not add product',
+    logoutSuccess: 'Admin logged out.',
+    internetError: 'No internet connection. Please try again.',
+    serverConnection: 'Server connection',
+    kilo: 'kg',
+    litre: 'litre',
+    pending: 'Pending',
+    accepted: 'Accepted',
+    deliveredStatus: 'Delivered',
+    cancelled: 'Cancelled',
+  },
+};
+
+const productTranslations = {
+  'चावल': 'Rice',
+  'गेहूँ': 'Wheat',
+  'आटा': 'Wheat flour',
+  'चीनी': 'Sugar',
+  'सरसों तेल': 'Mustard oil',
+  'दाल': 'Lentils',
+};
 
 const money = value => '₹' + Number(value || 0).toFixed(0);
 
@@ -40,9 +230,7 @@ async function apiRequest(path, options = {}, token = '') {
       },
     });
   } catch (error) {
-    throw new Error(
-      'इंटरनेट कनेक्शन नहीं मिला। कृपया दोबारा कोशिश करें।',
-    );
+    throw new Error('इंटरनेट कनेक्शन नहीं मिला। कृपया दोबारा कोशिश करें।');
   }
 
   const result = await response.json().catch(() => ({}));
@@ -94,6 +282,8 @@ export default function App() {
   });
 
   const [screen, setScreen] = useState('home');
+  const [language, setLanguage] = useState('hi');
+  const t = key => translations[language]?.[key] || translations.hi[key] || key;
   const [cart, setCart] = useState({});
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -111,12 +301,17 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState('');
 
-  // Load saved local information and live products.
+  // Load saved local information, language preference and live products.
   useEffect(() => {
     let active = true;
 
     async function initialize() {
       try {
+        const savedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
+        if (active && (savedLanguage === 'hi' || savedLanguage === 'en')) {
+          setLanguage(savedLanguage);
+        }
+
         const saved = await AsyncStorage.getItem(KEY);
 
         if (saved && active) {
@@ -163,6 +358,13 @@ export default function App() {
     );
   }, [data]);
 
+  // Save selected language separately so existing saved app data stays unchanged.
+  useEffect(() => {
+    AsyncStorage.setItem(LANGUAGE_KEY, language).catch(error =>
+      console.log('Language save error:', error),
+    );
+  }, [language]);
+
   const items = useMemo(
     () =>
       data.products.filter(product =>
@@ -175,6 +377,31 @@ export default function App() {
     const product = data.products.find(item => item.id === id);
     return sum + (product ? product.price * quantity : 0);
   }, 0);
+
+  const productLabel = product => {
+    if (language === 'en') {
+      return productTranslations[product.name] || product.name;
+    }
+    return product.name;
+  };
+
+  const unitLabel = unit => {
+    if (language === 'en') {
+      if (unit === 'किलो' || unit === 'kg') return t('kilo');
+      if (unit === 'लीटर' || unit === 'litre' || unit === 'liter') return t('litre');
+    }
+    return unit;
+  };
+
+  const statusLabel = status => {
+    if (language === 'en') {
+      if (status === 'Pending') return t('pending');
+      if (status === 'Accepted') return t('accepted');
+      if (status === 'Delivered') return t('deliveredStatus');
+      if (status === 'Cancelled') return t('cancelled');
+    }
+    return status;
+  };
 
   const button = (label, onPress, primary = false, disabled = false) => (
     <TouchableOpacity
@@ -212,9 +439,9 @@ export default function App() {
   const header = (
     <View style={styles.header}>
       <Text style={styles.brand}>🛒 RationSetu</Text>
-      <Text style={styles.sub}>आपका राशन, आपके घर तक!</Text>
+      <Text style={styles.sub}>{t('tagline')}</Text>
       <Text style={styles.connection}>
-        {apiError ? '⚠️ सर्वर कनेक्शन जाँचें' : '🟢 ऑनलाइन सेवा'}
+        {apiError ? t('serverCheck') : t('online')}
       </Text>
     </View>
   );
@@ -235,17 +462,17 @@ export default function App() {
     if (loading) return;
 
     if (!name.trim()) {
-      Alert.alert('जानकारी अधूरी', 'कृपया ग्राहक का नाम भरें।');
+      Alert.alert(t('infoIncomplete'), t('fillName'));
       return;
     }
 
     if (!/^[0-9]{10}$/.test(phone.trim())) {
-      Alert.alert('मोबाइल नंबर गलत', '10 अंकों का मोबाइल नंबर भरें।');
+      Alert.alert(t('wrongMobile'), t('fillMobile'));
       return;
     }
 
     if (!address.trim()) {
-      Alert.alert('पता अधूरा', 'पूरा घर का पता भरें।');
+      Alert.alert(t('addressIncomplete'), t('fillAddress'));
       return;
     }
 
@@ -264,7 +491,7 @@ export default function App() {
       });
 
     if (!selectedItems.length) {
-      Alert.alert('सामान नहीं चुना', 'कम से कम एक सामान चुनें।');
+      Alert.alert(t('noItem'), t('chooseItem'));
       return;
     }
 
@@ -288,7 +515,7 @@ export default function App() {
       });
 
       if (!result.success) {
-        throw new Error(result.message || 'ऑर्डर सेव नहीं हुआ।');
+        throw new Error(result.message || t('orderNotSaved'));
       }
 
       const savedOrder = normalizeOrder(result.order);
@@ -302,11 +529,11 @@ export default function App() {
       setScreen('success');
 
       Alert.alert(
-        '✅ ऑर्डर सफल!',
-        'आपका ऑर्डर दुकान के सर्वर पर सफलतापूर्वक पहुँच गया है।',
+        t('orderSuccessTitle'),
+        t('orderServerSuccess'),
       );
     } catch (error) {
-      Alert.alert('ऑर्डर नहीं हुआ', error.message);
+      Alert.alert(t('orderFailed'), error.message);
     } finally {
       setLoading(false);
     }
@@ -315,7 +542,7 @@ export default function App() {
   // Admin login through backend.
   async function adminLogin() {
     if (!adminId.trim() || !adminPassword.trim()) {
-      Alert.alert('जानकारी अधूरी', 'Admin ID और Password भरें।');
+      Alert.alert(t('infoIncomplete'), t('adminInfo'));
       return;
     }
 
@@ -331,7 +558,7 @@ export default function App() {
       });
 
       if (!result.success || !result.token) {
-        throw new Error('Admin login असफल हुआ।');
+        throw new Error(t('adminFailed'));
       }
 
       setAdminToken(result.token);
@@ -339,9 +566,9 @@ export default function App() {
       await loadAdminOrders(result.token);
       setScreen('admin');
 
-      Alert.alert('✅ सफल', 'Admin Login सफल हो गया।');
+      Alert.alert(t('success'), t('adminLoginSuccess'));
     } catch (error) {
-      Alert.alert('Admin Login Error', error.message);
+      Alert.alert(t('adminError'), error.message);
     } finally {
       setLoading(false);
     }
@@ -361,7 +588,7 @@ export default function App() {
         }));
       }
     } catch (error) {
-      Alert.alert('ऑर्डर लोड नहीं हुए', error.message);
+      Alert.alert(t('ordersNotLoaded'), error.message);
     }
   }
 
@@ -391,10 +618,10 @@ export default function App() {
           ),
         }));
 
-        Alert.alert('✅ सफल', 'ऑर्डर की स्थिति अपडेट हो गई।');
+        Alert.alert(t('success'), t('orderUpdated'));
       }
     } catch (error) {
-      Alert.alert('अपडेट असफल', error.message);
+      Alert.alert(t('updateFailed'), error.message);
     } finally {
       setLoading(false);
     }
@@ -403,7 +630,7 @@ export default function App() {
   // Add product through backend.
   async function addProduct() {
     if (!newName.trim() || !newPrice.trim() || !newStock.trim()) {
-      Alert.alert('जानकारी अधूरी', 'सामान, कीमत और स्टॉक भरें।');
+      Alert.alert(t('infoIncomplete'), t('productInfo'));
       return;
     }
 
@@ -416,7 +643,7 @@ export default function App() {
       !Number.isInteger(stock) ||
       stock < 0
     ) {
-      Alert.alert('गलत जानकारी', 'कीमत और स्टॉक सही भरें।');
+      Alert.alert(t('wrongInfo'), t('priceStockError'));
       return;
     }
 
@@ -437,7 +664,7 @@ export default function App() {
       );
 
       if (!result.success || !result.product) {
-        throw new Error('सामान नहीं जुड़ पाया।');
+        throw new Error(t('productNotAdded'));
       }
 
       setData(previous => ({
@@ -452,9 +679,9 @@ export default function App() {
       setNewPrice('');
       setNewStock('');
 
-      Alert.alert('✅ सफल', 'नया सामान सर्वर पर जुड़ गया।');
+      Alert.alert(t('success'), t('productAdded'));
     } catch (error) {
-      Alert.alert('सामान नहीं जुड़ा', error.message);
+      Alert.alert(t('productAddFailed'), error.message);
     } finally {
       setLoading(false);
     }
@@ -464,7 +691,7 @@ export default function App() {
     setAdminToken('');
     setAdminId('');
     setScreen('home');
-    Alert.alert('सफल', 'Admin Logout हो गया।');
+    Alert.alert(t('success'), t('logoutSuccess'));
   }
 
   return (
@@ -472,37 +699,36 @@ export default function App() {
       {header}
 
       <View style={styles.nav}>
-        {button('होम', () => setScreen('home'))}
-        {button('मेरे ऑर्डर', () => setScreen('myorders'))}
+        {button(t('home'), () => setScreen('home'))}
+        {button(t('myOrders'), () => setScreen('myorders'))}
         {button(
-          'दुकान एडमिन',
+          t('shopAdmin'),
           () => setScreen(adminToken ? 'admin' : 'adminlogin'),
         )}
+        {button(t('settings'), () => setScreen('settings'))}
       </View>
 
       {loading && (
         <View style={styles.loading}>
           <ActivityIndicator size="small" color="#176b3a" />
-          <Text style={styles.muted}>कृपया इंतजार करें...</Text>
+          <Text style={styles.muted}>{t('wait')}</Text>
         </View>
       )}
 
       {screen === 'home' && (
         <ScrollView style={styles.body}>
-          <Text style={styles.title}>राशन और किराना ऑर्डर करें</Text>
+          <Text style={styles.title}>{t('orderTitle')}</Text>
 
-          <Text style={styles.muted}>
-            सेवा क्षेत्र: जटवारा और आसपास, शुरुआती 15 km
-          </Text>
+          <Text style={styles.muted}>{t('serviceArea')}</Text>
 
-          {field(search, setSearch, 'सामान खोजें')}
+          {field(search, setSearch, t('search'))}
 
           {items.map(product => (
             <View key={product.id} style={styles.row}>
               <View style={{flex: 1}}>
-                <Text style={styles.item}>{product.name}</Text>
+                <Text style={styles.item}>{productLabel(product)}</Text>
                 <Text style={styles.muted}>
-                  {money(product.price)} / {product.unit} · उपलब्ध:{' '}
+                  {money(product.price)} / {unitLabel(product.unit)} · {t('available')}:{' '}
                   {product.stock}
                 </Text>
               </View>
@@ -516,52 +742,43 @@ export default function App() {
           ))}
 
           {items.length === 0 && (
-            <Text style={styles.muted}>कोई सामान नहीं मिला।</Text>
+            <Text style={styles.muted}>{t('noProduct')}</Text>
           )}
 
-          <Text style={styles.title}>डिलीवरी की जानकारी</Text>
+          <Text style={styles.title}>{t('deliveryInfo')}</Text>
 
-          {field(name, setName, 'ग्राहक का नाम')}
-          {field(phone, setPhone, '10 अंकों का मोबाइल नंबर', 'phone-pad')}
-          {field(address, setAddress, 'पूरा घर का पता')}
+          {field(name, setName, t('customerName'))}
+          {field(phone, setPhone, t('mobile'), 'phone-pad')}
+          {field(address, setAddress, t('fullAddress'))}
 
           <View style={styles.total}>
-            <Text style={styles.item}>कुल: {money(total)}</Text>
-            <Text style={styles.muted}>
-              भुगतान: सामान मिलने पर नकद (COD)
-            </Text>
+            <Text style={styles.item}>{t('total')}: {money(total)}</Text>
+            <Text style={styles.muted}>{t('paymentCod')}</Text>
           </View>
 
-          {button(
-            'COD ऑर्डर भेजें',
-            placeOrder,
-            true,
-            loading,
-          )}
+          {button(t('sendOrder'), placeOrder, true, loading)}
         </ScrollView>
       )}
 
       {screen === 'success' && (
         <View style={styles.body}>
-          <Text style={styles.title}>✅ ऑर्डर सफलतापूर्वक भेज दिया गया!</Text>
-          <Text style={styles.muted}>
-            आपका ऑर्डर ऑनलाइन दुकान के सर्वर पर सेव हो गया है।
-          </Text>
-          {button('होम पर जाएँ', () => setScreen('home'), true)}
-          {button('मेरे ऑर्डर देखें', () => setScreen('myorders'))}
+          <Text style={styles.title}>✅ {t('orderSuccess')}</Text>
+          <Text style={styles.muted}>{t('orderSaved')}</Text>
+          {button(t('goHome'), () => setScreen('home'), true)}
+          {button(t('seeOrders'), () => setScreen('myorders'))}
         </View>
       )}
 
       {screen === 'myorders' && (
         <ScrollView style={styles.body}>
-          <Text style={styles.title}>मेरे ऑर्डर</Text>
+          <Text style={styles.title}>{t('myOrders')}</Text>
 
           {data.orders
             .filter(order => order.phone === phone.trim())
             .map(order => (
               <View style={styles.card} key={order.id}>
                 <Text style={styles.item}>
-                  {order.id} · {order.status}
+                  {order.id} · {statusLabel(order.status)}
                 </Text>
                 <Text>
                   {order.items.map(item =>
@@ -574,55 +791,50 @@ export default function App() {
             ))}
 
           {!data.orders.some(order => order.phone === phone.trim()) && (
-            <Text style={styles.muted}>
-              इस फोन में इस मोबाइल नंबर का कोई ऑर्डर रिकॉर्ड नहीं मिला।
-            </Text>
+            <Text style={styles.muted}>{t('noOrderForPhone')}</Text>
           )}
         </ScrollView>
       )}
 
       {screen === 'adminlogin' && (
         <ScrollView style={styles.body}>
-          <Text style={styles.title}>दुकान एडमिन लॉगिन</Text>
+          <Text style={styles.title}>{t('adminLogin')}</Text>
 
-          {field(adminId, setAdminId, 'Admin ID')}
+          {field(adminId, setAdminId, t('adminId'))}
           {field(
             adminPassword,
             setAdminPassword,
-            'Admin Password',
+            t('adminPassword'),
             'default',
             true,
           )}
 
-          {button('Admin Login', adminLogin, true, loading)}
+          {button(t('adminLogin'), adminLogin, true, loading)}
         </ScrollView>
       )}
 
       {screen === 'admin' && (
         <ScrollView style={styles.body}>
-          <Text style={styles.title}>दुकान एडमिन पैनल</Text>
+          <Text style={styles.title}>{t('adminPanel')}</Text>
 
           <Text style={styles.muted}>
-            कुल ऑर्डर: {data.orders.length}
+            {t('orderCount')}: {data.orders.length}
           </Text>
 
-          {button(
-            'ऑर्डर रिफ्रेश करें',
-            () => loadAdminOrders(),
-          )}
+          {button(t('refreshOrders'), () => loadAdminOrders())}
 
-          <Text style={styles.item}>नया सामान जोड़ें</Text>
+          <Text style={styles.item}>{t('addProductTitle')}</Text>
 
-          {field(newName, setNewName, 'सामान का नाम')}
-          {field(newPrice, setNewPrice, 'कीमत ₹', 'numeric')}
-          {field(newStock, setNewStock, 'स्टॉक', 'numeric')}
+          {field(newName, setNewName, t('productName'))}
+          {field(newPrice, setNewPrice, t('price'), 'numeric')}
+          {field(newStock, setNewStock, t('stock'), 'numeric')}
 
-          {button('सामान जोड़ें', addProduct, true, loading)}
+          {button(t('addProduct'), addProduct, true, loading)}
 
-          <Text style={styles.title}>सभी ऑनलाइन ऑर्डर</Text>
+          <Text style={styles.title}>{t('allOrders')}</Text>
 
           {data.orders.length === 0 && (
-            <Text style={styles.muted}>अभी कोई ऑर्डर नहीं आया है।</Text>
+            <Text style={styles.muted}>{t('noOrders')}</Text>
           )}
 
           {data.orders.map(order => (
@@ -644,24 +856,24 @@ export default function App() {
               </Text>
 
               <Text style={styles.muted}>
-                स्थिति: {order.status}
+                {t('status')}: {statusLabel(order.status)}
               </Text>
 
-              {button('ऑर्डर स्वीकार करें', () =>
+              {button(t('accept'), () =>
                 updateOrderStatus(order.id, 'Accepted'),
               )}
 
-              {button('डिलीवरी पूरी', () =>
+              {button(t('delivered'), () =>
                 updateOrderStatus(order.id, 'Delivered'),
               )}
 
-              {button('ऑर्डर रद्द करें', () =>
+              {button(t('cancel'), () =>
                 updateOrderStatus(order.id, 'Cancelled'),
               )}
             </View>
           ))}
 
-          <Text style={styles.title}>दुकान की जानकारी</Text>
+          <Text style={styles.title}>{t('shopInfo')}</Text>
 
           {field(
             data.shop.name,
@@ -669,7 +881,7 @@ export default function App() {
               ...previous,
               shop: {...previous.shop, name: value},
             })),
-            'दुकान का नाम',
+            t('shopName'),
           )}
 
           {field(
@@ -678,7 +890,7 @@ export default function App() {
               ...previous,
               shop: {...previous.shop, phone: value},
             })),
-            'दुकान मोबाइल नंबर',
+            t('shopPhone'),
             'phone-pad',
           )}
 
@@ -688,10 +900,56 @@ export default function App() {
               ...previous,
               shop: {...previous.shop, address: value},
             })),
-            'दुकान का पता',
+            t('shopAddress'),
           )}
 
-          {button('Admin Logout', logoutAdmin)}
+          {button(t('logout'), logoutAdmin)}
+        </ScrollView>
+      )}
+
+      {screen === 'settings' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>{t('settings')}</Text>
+          <Text style={styles.item}>{t('language')} / Language</Text>
+          <Text style={styles.muted}>{t('chooseLanguage')}</Text>
+
+          <TouchableOpacity
+            onPress={() => {
+              setLanguage('hi');
+              AsyncStorage.setItem(LANGUAGE_KEY, 'hi').catch(error =>
+                console.log('Language save error:', error),
+              );
+              Alert.alert('भाषा', translations.hi.savedLanguage);
+            }}
+            style={[
+              styles.languageOption,
+              language === 'hi' && styles.selectedLanguage,
+            ]}>
+            <Text style={styles.languageText}>🇮🇳 हिन्दी</Text>
+            <Text style={styles.languageMark}>
+              {language === 'hi' ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setLanguage('en');
+              AsyncStorage.setItem(LANGUAGE_KEY, 'en').catch(error =>
+                console.log('Language save error:', error),
+              );
+              Alert.alert('Language', translations.en.savedLanguage);
+            }}
+            style={[
+              styles.languageOption,
+              language === 'en' && styles.selectedLanguage,
+            ]}>
+            <Text style={styles.languageText}>🇬🇧 English</Text>
+            <Text style={styles.languageMark}>
+              {language === 'en' ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
+
+          {button(t('goHome'), () => setScreen('home'), true)}
         </ScrollView>
       )}
     </SafeAreaView>
@@ -724,6 +982,7 @@ const styles = StyleSheet.create({
   nav: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    flexWrap: 'wrap',
     backgroundColor: '#e6efe8',
     paddingVertical: 5,
   },
@@ -802,5 +1061,30 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     marginVertical: 7,
+  },
+  languageOption: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d8e0d9',
+    borderRadius: 10,
+    padding: 15,
+    marginVertical: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedLanguage: {
+    borderColor: '#176b3a',
+    backgroundColor: '#e7f1e8',
+  },
+  languageText: {
+    color: '#203528',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  languageMark: {
+    color: '#176b3a',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 });
