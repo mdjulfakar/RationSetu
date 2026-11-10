@@ -18,7 +18,8 @@ const supabase = createClient(
 
 const PORT = process.env.PORT || 3000;
 
-// Temporary admin sessions
+// ================= ADMIN SECURITY =================
+
 const adminSessions = new Set();
 
 function requireAdmin(req, res, next) {
@@ -34,7 +35,61 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// Server check
+// ================= SHOP SETTINGS =================
+
+const RATIONSETU_SETTINGS_FILE = "rationsetu-settings.json";
+
+async function getRationSetuSettings() {
+  const bucket =
+    process.env.SUPABASE_PRODUCT_IMAGES_BUCKET || "product-images";
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .download(RATIONSETU_SETTINGS_FILE);
+
+  if (error || !data) {
+    return {
+      shop_address: "जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार",
+      shop_lat: null,
+      shop_lng: null,
+      support_phone: "",
+      radius_km: 15,
+      rate_per_km: 7,
+      fixed_extra_fee: 90,
+      delivery_person_share: 60,
+      rationsetu_share: 30
+    };
+  }
+
+  try {
+    return JSON.parse(await data.text());
+  } catch (error) {
+    throw new Error("Saved shop settings could not be read");
+  }
+}
+
+// Calculate straight-line distance between GPS coordinates.
+function rationsetuDistanceKm(lat1, lon1, lat2, lon2) {
+  const toRad = value => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+
+  return earthRadiusKm * 2 * Math.atan2(
+    Math.sqrt(a),
+    Math.sqrt(1 - a)
+  );
+}
+
+// ================= SERVER CHECK =================
+
 app.get("/", (req, res) => {
   res.json({
     success: true,
@@ -42,80 +97,187 @@ app.get("/", (req, res) => {
   });
 });
 
-// Get products
+// ================= CUSTOMER: PRODUCTS =================
+
 app.get("/api/products", async (req, res) => {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("is_active", true)
-    .order("name");
+  try {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("is_active", true)
+      .order("name");
 
-  if (error) {
-    return res.status(500).json({
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      products: data
+    });
+  } catch (error) {
+    res.status(500).json({
       success: false,
-      error: error.message
+      message: error.message
     });
   }
-
-  res.json({ success: true, products: data });
 });
 
-// Place COD order
+// ================= CUSTOMER: PLACE COD ORDER =================
+
 app.post("/api/orders", async (req, res) => {
-  const {
-    customer_name,
-    mobile,
-    address,
-    items,
-    total_amount
-  } = req.body;
+  try {
+    const {
+      customer_name,
+      mobile,
+      address,
+      items,
+      total_amount,
+      customer_lat,
+      customer_lng
+    } = req.body;
 
-  if (
-    !customer_name ||
-    !mobile ||
-    !address ||
-    !Array.isArray(items) ||
-    items.length === 0 ||
-    !Number.isFinite(Number(total_amount)) ||
-    Number(total_amount) <= 0
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Please provide all order details"
+    // Validate customer and order details.
+    if (
+      !String(customer_name || "").trim() ||
+      !/^[0-9]{10}$/.test(String(mobile || "").trim()) ||
+      !String(address || "").trim() ||
+      !Array.isArray(items) ||
+      items.length === 0 ||
+      !Number.isFinite(Number(total_amount)) ||
+      Number(total_amount) <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide customer name, valid mobile, full address and order items."
+      });
+    }
+
+    // GPS is compulsory for checking the 15 KM service area.
+    if (
+      customer_lat === undefined ||
+      customer_lng === undefined ||
+      customer_lat === null ||
+      customer_lng === null ||
+      !Number.isFinite(Number(customer_lat)) ||
+      !Number.isFinite(Number(customer_lng)) ||
+      Number(customer_lat) < -90 ||
+      Number(customer_lat) > 90 ||
+      Number(customer_lng) < -180 ||
+      Number(customer_lng) > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        code: "LOCATION_REQUIRED",
+        message: "Please allow location access to check store availability."
+      });
+    }
+
+    const settings = await getRationSetuSettings();
+
+    // Admin must save the shop GPS location before orders are accepted.
+    if (
+      settings.shop_lat === null ||
+      settings.shop_lng === null ||
+      settings.shop_lat === undefined ||
+      settings.shop_lng === undefined ||
+      !Number.isFinite(Number(settings.shop_lat)) ||
+      !Number.isFinite(Number(settings.shop_lng))
+    ) {
+      return res.status(503).json({
+        success: false,
+        code: "STORE_LOCATION_NOT_SET",
+        message: "Store location has not been configured by admin yet."
+      });
+    }
+
+    const radiusKm = Number(settings.radius_km) || 15;
+    const ratePerKm = Number(settings.rate_per_km) || 7;
+    const fixedExtraFee = Number(settings.fixed_extra_fee) || 90;
+    const deliveryPersonFixedShare =
+      Number(settings.delivery_person_share) || 60;
+    const rationsetuFixedShare =
+      Number(settings.rationsetu_share) || 30;
+
+    const distanceKm = rationsetuDistanceKm(
+      Number(settings.shop_lat),
+      Number(settings.shop_lng),
+      Number(customer_lat),
+      Number(customer_lng)
+    );
+
+    // Block orders outside the permitted radius.
+    if (distanceKm > radiusKm) {
+      return res.status(403).json({
+        success: false,
+        code: "STORE_NOT_AVAILABLE",
+        message: "Store not available. Delivery is available only within 15 KM.",
+        distance_km: Number(distanceKm.toFixed(2)),
+        radius_km: radiusKm
+      });
+    }
+
+    const subtotal = Number(total_amount);
+
+    // Distance charge is rounded up to the next rupee.
+    const distanceCharge = Math.ceil(distanceKm * ratePerKm);
+    const deliveryCharge = distanceCharge + fixedExtraFee;
+    const finalTotal = subtotal + deliveryCharge;
+
+    const order = {
+      customer_name: String(customer_name).trim(),
+      mobile: String(mobile).trim(),
+      address: String(address).trim(),
+      items,
+      total_amount: finalTotal,
+      payment_method: "COD",
+      status: "Pending"
+    };
+
+    const { data, error } = await supabase
+      .from("orders")
+      .insert(order)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Order placed successfully",
+      order: data,
+      delivery: {
+        distance_km: Number(distanceKm.toFixed(2)),
+        rate_per_km: ratePerKm,
+        distance_charge: distanceCharge,
+        fixed_extra_fee: fixedExtraFee,
+        delivery_person_share:
+          deliveryPersonFixedShare + distanceCharge,
+        rationsetu_share: rationsetuFixedShare,
+        delivery_charge: deliveryCharge,
+        subtotal,
+        payable_total: finalTotal
+      }
     });
-  }
 
-  const order = {
-    customer_name,
-    mobile,
-    address,
-    items,
-    total_amount: Number(total_amount),
-    payment_method: "COD",
-    status: "Pending"
-  };
-
-  const { data, error } = await supabase
-    .from("orders")
-    .insert(order)
-    .select()
-    .single();
-
-  if (error) {
+  } catch (error) {
     return res.status(500).json({
       success: false,
-      error: error.message
+      message: error.message || "Order could not be placed."
     });
   }
-
-  res.status(201).json({
-    success: true,
-    message: "Order placed successfully",
-    order: data
-  });
 });
 
-// Admin login
+// ================= ADMIN: LOGIN =================
+
 app.post("/api/admin/login", (req, res) => {
   const { admin_id, password } = req.body;
 
@@ -141,61 +303,84 @@ app.post("/api/admin/login", (req, res) => {
   });
 });
 
-// Admin: View all orders
+// ================= ADMIN: VIEW ORDERS =================
+
 app.get("/api/admin/orders", requireAdmin, async (req, res) => {
-  const { data, error } = await supabase
-    .from("orders")
-    .select("*")
-    .order("created_at", { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    return res.status(500).json({
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      orders: data
+    });
+  } catch (error) {
+    res.status(500).json({
       success: false,
-      error: error.message
+      message: error.message
     });
   }
-
-  res.json({ success: true, orders: data });
 });
 
-// Admin: Update order status
+// ================= ADMIN: UPDATE ORDER STATUS =================
+
 app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
-  const allowedStatuses = [
-    "Pending",
-    "Accepted",
-    "Preparing",
-    "Out for Delivery",
-    "Delivered",
-    "Cancelled"
-  ];
+  try {
+    const allowedStatuses = [
+      "Pending",
+      "Accepted",
+      "Preparing",
+      "Out for Delivery",
+      "Delivered",
+      "Cancelled"
+    ];
 
-  const { status } = req.body;
+    const { status } = req.body;
 
-  if (!allowedStatuses.includes(status)) {
-    return res.status(400).json({
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order status"
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("orders")
+      .update({ status })
+      .eq("id", req.params.id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      order: data
+    });
+  } catch (error) {
+    res.status(500).json({
       success: false,
-      message: "Invalid order status"
+      message: error.message
     });
   }
-
-  const { data, error } = await supabase
-    .from("orders")
-    .update({ status })
-    .eq("id", req.params.id)
-    .select()
-    .single();
-
-  if (error) {
-    return res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-
-  res.json({ success: true, order: data });
 });
 
-// Admin: Upload product image
+// ================= ADMIN: UPLOAD PRODUCT IMAGE =================
+
 app.post(
   "/api/admin/products/upload-image",
   requireAdmin,
@@ -206,7 +391,9 @@ app.post(
   async (req, res) => {
     try {
       const contentType = req.headers["content-type"] || "";
-      const match = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+      const match = contentType.match(
+        /boundary=(?:"([^"]+)"|([^;]+))/i
+      );
       const boundaryValue = match && (match[1] || match[2]);
 
       if (!boundaryValue || !Buffer.isBuffer(req.body)) {
@@ -315,169 +502,135 @@ app.post(
   }
 );
 
-// Admin: Add product
+// ================= ADMIN: ADD PRODUCT =================
+
 app.post("/api/admin/products", requireAdmin, async (req, res) => {
-  const { name, price, stock, category, image_url } = req.body;
-
-  if (
-    !name ||
-    !Number.isFinite(Number(price)) ||
-    Number(price) < 0 ||
-    !Number.isInteger(Number(stock)) ||
-    Number(stock) < 0
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Valid product name, price and stock required"
-    });
-  }
-
-  const { data, error } = await supabase
-    .from("products")
-    .insert({
-      name,
-      price: Number(price),
-      stock: Number(stock),
-      category: category || null,
-      image_url: image_url || null,
-      is_active: true
-    })
-    .select()
-    .single();
-
-  if (error) {
-    return res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-
-  res.status(201).json({ success: true, product: data });
-});
-
-// Admin: Update product
-app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
-  const allowedFields = [
-    "name",
-    "price",
-    "stock",
-    "category",
-    "image_url",
-    "is_active"
-  ];
-
-  const updates = {};
-
-  for (const key of allowedFields) {
-    if (req.body[key] !== undefined) {
-      updates[key] = req.body[key];
-    }
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return res.status(400).json({
-      success: false,
-      message: "No valid product updates provided"
-    });
-  }
-
-  if (
-    "price" in updates &&
-    (!Number.isFinite(Number(updates.price)) ||
-      Number(updates.price) < 0)
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid price"
-    });
-  }
-
-  if (
-    "stock" in updates &&
-    (!Number.isInteger(Number(updates.stock)) ||
-      Number(updates.stock) < 0)
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid stock"
-    });
-  }
-
-  const { data, error } = await supabase
-    .from("products")
-    .update(updates)
-    .eq("id", req.params.id)
-    .select()
-    .single();
-
-  if (error) {
-    return res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-
-  res.json({ success: true, product: data });
-});
-
-// ================= RATIONSETU NEW SETTINGS =================
-
-// Shop and delivery settings are stored in Supabase Storage.
-// No database table changes are required.
-
-const RATIONSETU_SETTINGS_FILE = "rationsetu-settings.json";
-
-async function getRationSetuSettings() {
-  const bucket =
-    process.env.SUPABASE_PRODUCT_IMAGES_BUCKET || "product-images";
-
-  const { data, error } = await supabase.storage
-    .from(bucket)
-    .download(RATIONSETU_SETTINGS_FILE);
-
-  if (error || !data) {
-    return {
-      shop_address: "जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार",
-      shop_lat: null,
-      shop_lng: null,
-      support_phone: "",
-      radius_km: 15,
-      rate_per_km: 7,
-      fixed_extra_fee: 90,
-      delivery_person_share: 60,
-      rationsetu_share: 30
-    };
-  }
-
   try {
-    return JSON.parse(await data.text());
-  } catch (e) {
-    throw new Error("Saved shop settings could not be read");
+    const { name, price, stock, category, image_url } = req.body;
+
+    if (
+      !name ||
+      !Number.isFinite(Number(price)) ||
+      Number(price) < 0 ||
+      !Number.isInteger(Number(stock)) ||
+      Number(stock) < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid product name, price and stock required"
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .insert({
+        name,
+        price: Number(price),
+        stock: Number(stock),
+        category: category || null,
+        image_url: image_url || null,
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      product: data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
-}
+});
 
-// Straight-line distance between two GPS points.
-function rationsetuDistanceKm(lat1, lon1, lat2, lon2) {
-  const toRad = value => (value * Math.PI) / 180;
-  const earthRadiusKm = 6371;
+// ================= ADMIN: UPDATE PRODUCT =================
 
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
+app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
+  try {
+    const allowedFields = [
+      "name",
+      "price",
+      "stock",
+      "category",
+      "image_url",
+      "is_active"
+    ];
 
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    const updates = {};
 
-  return earthRadiusKm * 2 * Math.atan2(
-    Math.sqrt(a),
-    Math.sqrt(1 - a)
-  );
-}
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) {
+        updates[key] = req.body[key];
+      }
+    }
 
-// Public settings for customer app.
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid product updates provided"
+      });
+    }
+
+    if (
+      "price" in updates &&
+      (!Number.isFinite(Number(updates.price)) ||
+        Number(updates.price) < 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid price"
+      });
+    }
+
+    if (
+      "stock" in updates &&
+      (!Number.isInteger(Number(updates.stock)) ||
+        Number(updates.stock) < 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid stock"
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .update(updates)
+      .eq("id", req.params.id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      product: data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ================= PUBLIC APP CONFIG =================
+
 app.get("/api/config", async (req, res) => {
   try {
     const settings = await getRationSetuSettings();
@@ -490,6 +643,10 @@ app.get("/api/config", async (req, res) => {
       rate_per_km: settings.rate_per_km,
       fixed_extra_fee: settings.fixed_extra_fee,
       shop_location_ready:
+        settings.shop_lat !== null &&
+        settings.shop_lng !== null &&
+        settings.shop_lat !== undefined &&
+        settings.shop_lng !== undefined &&
         Number.isFinite(Number(settings.shop_lat)) &&
         Number.isFinite(Number(settings.shop_lng))
     });
@@ -501,7 +658,8 @@ app.get("/api/config", async (req, res) => {
   }
 });
 
-// Admin saves shop GPS and customer support number.
+// ================= ADMIN: SAVE SHOP LOCATION & SETTINGS =================
+
 app.post("/api/admin/config", requireAdmin, async (req, res) => {
   try {
     const {
@@ -512,6 +670,10 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
     } = req.body;
 
     if (
+      shop_lat === undefined ||
+      shop_lng === undefined ||
+      shop_lat === null ||
+      shop_lng === null ||
       !Number.isFinite(Number(shop_lat)) ||
       !Number.isFinite(Number(shop_lng)) ||
       Number(shop_lat) < -90 ||
@@ -531,8 +693,7 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
       ...previous,
       shop_lat: Number(shop_lat),
       shop_lng: Number(shop_lng),
-      shop_address:
-        shop_address || previous.shop_address,
+      shop_address: shop_address || previous.shop_address,
       support_phone:
         support_phone !== undefined
           ? String(support_phone).trim()
@@ -545,7 +706,8 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
     };
 
     const bucket =
-      process.env.SUPABASE_PRODUCT_IMAGES_BUCKET || "product-images";
+      process.env.SUPABASE_PRODUCT_IMAGES_BUCKET ||
+      "product-images";
 
     const { error } = await supabase.storage
       .from(bucket)
@@ -570,6 +732,7 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
       message: "Shop location and settings saved",
       settings
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -578,9 +741,8 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
   }
 });
 
-// ================= END NEW SETTINGS =================
+// ================= START SERVER =================
 
-// Start server
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
 });
