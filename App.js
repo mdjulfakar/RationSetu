@@ -245,8 +245,8 @@ const money = value => '₹' + Number(value || 0).toFixed(0);
 async function apiRequest(path, options = {}, token = '') {
   let response;
 
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+  response = await fetch(API_BASE_URL + path, {
+     {
       ...options,
       headers: {
         'Content-Type': 'application/json',
