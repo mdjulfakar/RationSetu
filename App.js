@@ -1,4 +1,4 @@
-
+ii
 ```javascript
 import React, {useEffect, useMemo, useState} from 'react';
 import {
@@ -719,3 +719,721 @@ export default function App() {
     if (!photo?.uri) throw new Error(t('uploadFailed'));
 
     const form = new FormData();
+    form.append('file', {
+      uri: photo.uri,
+      name: photo.fileName || `product-${Date.now()}.jpg`,
+      type: photo.mimeType || 'image/jpeg',
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/products/upload-image`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: form,
+      },
+    );
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || result.error || t('uploadFailed'));
+    }
+
+    const imageUrl = result.image_url || result.url;
+    if (!imageUrl) throw new Error(t('uploadFailed'));
+    return imageUrl;
+  }
+
+  // Add product through backend.
+  async function addProduct() {
+    if (!newName.trim() || !newPrice.trim() || !newStock.trim()) {
+      Alert.alert(t('infoIncomplete'), t('productInfo'));
+      return;
+    }
+
+    const price = Number(newPrice);
+    const stock = Number(newStock);
+
+    if (
+      !Number.isFinite(price) ||
+      price <= 0 ||
+      !Number.isInteger(stock) ||
+      stock < 0
+    ) {
+      Alert.alert(t('wrongInfo'), t('priceStockError'));
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const imageUrl = newImage ? await uploadProductImage(newImage) : null;
+      const result = await apiRequest(
+        '/api/admin/products',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name: newName.trim(),
+            price,
+            stock,
+            image_url: imageUrl,
+          }),
+        },
+        adminToken,
+      );
+
+      if (!result.success || !result.product) {
+        throw new Error(t('productNotAdded'));
+      }
+
+      setData(previous => ({
+        ...previous,
+        products: [
+          ...previous.products,
+          normalizeProduct(result.product),
+        ],
+      }));
+
+      setNewName('');
+      setNewPrice('');
+      setNewStock('');
+      setNewImage(null);
+
+      Alert.alert(t('success'), t('productAdded'));
+    } catch (error) {
+      Alert.alert(t('productAddFailed'), error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Add or replace the photo for an existing product.
+  async function replaceProductImage(product) {
+    if (loading || uploadingPhotoId) return;
+
+    const photo = await chooseProductImage();
+    if (!photo) return;
+
+    setUploadingPhotoId(product.id);
+    try {
+      const imageUrl = await uploadProductImage(photo);
+      const result = await apiRequest(
+        `/api/admin/products/${encodeURIComponent(product.id)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({image_url: imageUrl}),
+        },
+        adminToken,
+      );
+
+      if (!result.success) {
+        throw new Error(result.message || t('uploadFailed'));
+      }
+
+      setData(previous => ({
+        ...previous,
+        products: previous.products.map(item =>
+          item.id === product.id
+            ? {...item, image_url: imageUrl}
+            : item,
+        ),
+      }));
+
+      Alert.alert(t('success'), t('photoUploaded'));
+    } catch (error) {
+      Alert.alert(t('uploadFailed'), error.message);
+    } finally {
+      setUploadingPhotoId('');
+    }
+  }
+
+  // Update the existing product price and stock.
+  async function saveProductPriceStock(product) {
+    if (loading) return;
+
+    const draft = editingProducts[product.id] || {};
+    const priceText = String(draft.price ?? product.price).trim();
+    const stockText = String(draft.stock ?? product.stock).trim();
+    const price = Number(priceText);
+    const stock = Number(stockText);
+
+    if (!priceText || !Number.isFinite(price) || price <= 0) {
+      Alert.alert(t('wrongInfo'), t('changesFailed'));
+      return;
+    }
+
+    if (!stockText || !Number.isInteger(stock) || stock < 0) {
+      Alert.alert(t('wrongInfo'), t('changesFailed'));
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const result = await apiRequest(
+        `/api/admin/products/${encodeURIComponent(product.id)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({price, stock}),
+        },
+        adminToken,
+      );
+
+      if (!result.success) {
+        throw new Error(result.message || t('changesFailed'));
+      }
+
+      setData(previous => ({
+        ...previous,
+        products: previous.products.map(item =>
+          item.id === product.id
+            ? {...item, price, stock}
+            : item,
+        ),
+      }));
+
+      setEditingProducts(previous => {
+        const next = {...previous};
+        delete next[product.id];
+        return next;
+      });
+
+      Alert.alert(t('success'), t('changesSaved'));
+    } catch (error) {
+      Alert.alert(t('changesFailed'), error.message || t('changesFailed'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function logoutAdmin() {
+    setAdminToken('');
+    setAdminId('');
+    setScreen('home');
+    Alert.alert(t('success'), t('logoutSuccess'));
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      {header}
+
+      <View style={styles.nav}>
+        {button(t('home'), () => setScreen('home'))}
+        {button(t('myOrders'), () => setScreen('myorders'))}
+        {button(
+          t('shopAdmin'),
+          () => setScreen(adminToken ? 'admin' : 'adminlogin'),
+        )}
+        {button(t('settings'), () => setScreen('settings'))}
+      </View>
+
+      {loading && (
+        <View style={styles.loading}>
+          <ActivityIndicator size="small" color="#1769aa" />
+          <Text style={styles.muted}>{t('wait')}</Text>
+        </View>
+      )}
+
+      {screen === 'home' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>{t('orderTitle')}</Text>
+
+          <Text style={styles.muted}>{t('serviceArea')}</Text>
+
+          {field(search, setSearch, t('search'))}
+
+          {items.map(product => (
+            <View key={product.id} style={styles.row}>
+              {product.image_url ? (
+                <Image
+                  source={{uri: product.image_url}}
+                  style={styles.productImage}
+                />
+              ) : null}
+
+              <View style={{flex: 1}}>
+                <Text style={styles.item}>{productLabel(product)}</Text>
+                <Text style={styles.muted}>
+                  {money(product.price)} / {unitLabel(product.unit)} · {t('available')}:{' '}
+                  {product.stock}
+                </Text>
+              </View>
+
+              <View style={styles.qty}>
+                {button('−', () => changeQuantity(product.id, -1))}
+                <Text style={styles.item}>{cart[product.id] || 0}</Text>
+                {button('+', () => changeQuantity(product.id, 1))}
+              </View>
+            </View>
+          ))}
+
+          {items.length === 0 && (
+            <Text style={styles.muted}>{t('noProduct')}</Text>
+          )}
+
+          <Text style={styles.title}>{t('deliveryInfo')}</Text>
+
+          {field(name, setName, t('customerName'))}
+          {field(phone, setPhone, t('mobile'), 'phone-pad')}
+          {field(address, setAddress, t('fullAddress'))}
+
+          <View style={styles.total}>
+            <Text style={styles.item}>
+              {t('total')}: {money(total)}
+            </Text>
+            <Text style={styles.muted}>{t('paymentCod')}</Text>
+          </View>
+
+          {button(t('sendOrder'), placeOrder, true, loading)}
+        </ScrollView>
+      )}
+
+      {screen === 'success' && (
+        <View style={styles.body}>
+          <Text style={styles.title}>✅ {t('orderSuccess')}</Text>
+          <Text style={styles.muted}>{t('orderSaved')}</Text>
+          {button(t('goHome'), () => setScreen('home'), true)}
+          {button(t('seeOrders'), () => setScreen('myorders'))}
+        </View>
+      )}
+
+      {screen === 'myorders' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>{t('myOrders')}</Text>
+
+          {data.orders
+            .filter(order => order.phone === phone.trim())
+            .map(order => (
+              <View style={styles.card} key={order.id}>
+                <Text style={styles.item}>
+                  {order.id} · {statusLabel(order.status)}
+                </Text>
+
+                <Text>
+                  {order.items.map(item =>
+                    `${item.name} × ${item.qty}`,
+                  ).join(', ')}
+                </Text>
+
+                <Text>{money(order.total)} · {order.payment}</Text>
+                <Text style={styles.muted}>{order.createdAt}</Text>
+              </View>
+            ))}
+
+          {!data.orders.some(order => order.phone === phone.trim()) && (
+            <Text style={styles.muted}>{t('noOrderForPhone')}</Text>
+          )}
+        </ScrollView>
+      )}
+
+      {screen === 'adminlogin' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>{t('adminLogin')}</Text>
+
+          {field(adminId, setAdminId, t('adminId'))}
+
+          {field(
+            adminPassword,
+            setAdminPassword,
+            t('adminPassword'),
+            'default',
+            true,
+          )}
+
+          {button(t('adminLogin'), adminLogin, true, loading)}
+        </ScrollView>
+      )}
+
+      {screen === 'admin' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>{t('adminPanel')}</Text>
+
+          <Text style={styles.muted}>
+            {t('orderCount')}: {data.orders.length}
+          </Text>
+
+          {button(t('refreshOrders'), () => loadAdminOrders())}
+
+          <Text style={styles.item}>{t('addProductTitle')}</Text>
+
+          {field(newName, setNewName, t('productName'))}
+          {field(newPrice, setNewPrice, t('price'), 'numeric')}
+          {field(newStock, setNewStock, t('stock'), 'numeric')}
+
+          {newImage ? (
+            <Image
+              source={{uri: newImage.uri}}
+              style={styles.imagePreview}
+            />
+          ) : null}
+
+          {button(t('choosePhoto'), selectNewProductImage, false, loading)}
+
+          {button(t('addProduct'), addProduct, true, loading)}
+
+          <Text style={styles.item}>
+            {t('productImage')} · {t('replacePhoto')}
+          </Text>
+
+          {data.products.map(product => (
+            <View key={product.id} style={styles.card}>
+              <View style={styles.productAdminRow}>
+                {product.image_url ? (
+                  <Image
+                    source={{uri: product.image_url}}
+                    style={styles.productImage}
+                  />
+                ) : null}
+
+                <View style={{flex: 1}}>
+                  <Text style={styles.item}>{productLabel(product)}</Text>
+
+                  <Text style={styles.muted}>
+                    {money(product.price)} · {t('stock')}: {product.stock}
+                  </Text>
+
+                  <Text style={styles.editLabel}>
+                    {t('editPriceStock')}
+                  </Text>
+
+                  {field(
+                    editingProducts[product.id]?.price ?? String(product.price),
+                    value =>
+                      setEditingProducts(previous => ({
+                        ...previous,
+                        [product.id]: {
+                          ...previous[product.id],
+                          price: value,
+                        },
+                      })),
+                    t('price'),
+                    'numeric',
+                  )}
+
+                  {field(
+                    editingProducts[product.id]?.stock ?? String(product.stock),
+                    value =>
+                      setEditingProducts(previous => ({
+                        ...previous,
+                        [product.id]: {
+                          ...previous[product.id],
+                          stock: value,
+                        },
+                      })),
+                    t('stock'),
+                    'numeric',
+                  )}
+
+                  {button(
+                    t('saveChanges'),
+                    () => saveProductPriceStock(product),
+                    true,
+                    loading,
+                  )}
+
+                  {button(
+                    uploadingPhotoId === product.id
+                      ? t('wait')
+                      : t('replacePhoto'),
+                    () => replaceProductImage(product),
+                    false,
+                    loading || !!uploadingPhotoId,
+                  )}
+                </View>
+              </View>
+            </View>
+          ))}
+
+          <Text style={styles.title}>{t('allOrders')}</Text>
+
+          {data.orders.length === 0 && (
+            <Text style={styles.muted}>{t('noOrders')}</Text>
+          )}
+
+          {data.orders.map(order => (
+            <View style={styles.card} key={order.id}>
+              <Text style={styles.item}>
+                {order.id} · {order.customer}
+              </Text>
+
+              <Text>{order.phone} · {order.address}</Text>
+
+              <Text>
+                {order.items.map(item =>
+                  `${item.name} × ${item.qty}`,
+                ).join(', ')}
+              </Text>
+
+              <Text>
+                {money(order.total)} · {order.payment}
+              </Text>
+
+              <Text style={styles.muted}>
+                {t('status')}: {statusLabel(order.status)}
+              </Text>
+
+              {button(t('accept'), () =>
+                updateOrderStatus(order.id, 'Accepted'),
+              )}
+
+              {button(t('delivered'), () =>
+                updateOrderStatus(order.id, 'Delivered'),
+              )}
+
+              {button(t('cancel'), () =>
+                updateOrderStatus(order.id, 'Cancelled'),
+              )}
+            </View>
+          ))}
+
+          <Text style={styles.title}>{t('shopInfo')}</Text>
+
+          {field(
+            data.shop.name,
+            value =>
+              setData(previous => ({
+                ...previous,
+                shop: {...previous.shop, name: value},
+              })),
+            t('shopName'),
+          )}
+
+          {field(
+            data.shop.phone,
+            value =>
+              setData(previous => ({
+                ...previous,
+                shop: {...previous.shop, phone: value},
+              })),
+            t('shopPhone'),
+            'phone-pad',
+          )}
+
+          {field(
+            data.shop.address,
+            value =>
+              setData(previous => ({
+                ...previous,
+                shop: {...previous.shop, address: value},
+              })),
+            t('shopAddress'),
+          )}
+
+          {button(t('logout'), logoutAdmin)}
+        </ScrollView>
+      )}
+
+      {screen === 'settings' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>{t('settings')}</Text>
+          <Text style={styles.item}>{t('language')} / Language</Text>
+          <Text style={styles.muted}>{t('chooseLanguage')}</Text>
+
+          <TouchableOpacity
+            onPress={() => {
+              setLanguage('hi');
+              AsyncStorage.setItem(LANGUAGE_KEY, 'hi').catch(error =>
+                console.log('Language save error:', error),
+              );
+              Alert.alert('भाषा', translations.hi.savedLanguage);
+            }}
+            style={[
+              styles.languageOption,
+              language === 'hi' && styles.selectedLanguage,
+            ]}>
+            <Text style={styles.languageText}>🇮🇳 हिन्दी</Text>
+            <Text style={styles.languageMark}>
+              {language === 'hi' ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setLanguage('en');
+              AsyncStorage.setItem(LANGUAGE_KEY, 'en').catch(error =>
+                console.log('Language save error:', error),
+              );
+              Alert.alert('Language', translations.en.savedLanguage);
+            }}
+            style={[
+              styles.languageOption,
+              language === 'en' && styles.selectedLanguage,
+            ]}>
+            <Text style={styles.languageText}>🇬🇧 English</Text>
+            <Text style={styles.languageMark}>
+              {language === 'en' ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
+
+          {button(t('goHome'), () => setScreen('home'), true)}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: '#f3f7fc',
+  },
+  header: {
+    backgroundColor: '#1769aa',
+    padding: 18,
+  },
+  brand: {
+    color: '#fff',
+    fontSize: 25,
+    fontWeight: 'bold',
+  },
+  sub: {
+    color: '#e8f2fb',
+    marginTop: 3,
+  },
+  connection: {
+    color: '#e8f2fb',
+    marginTop: 6,
+    fontSize: 12,
+  },
+  nav: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    backgroundColor: '#e7f1fb',
+    paddingVertical: 5,
+  },
+  body: {
+    padding: 15,
+  },
+  loading: {
+    padding: 8,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#12466f',
+    marginTop: 15,
+    marginBottom: 8,
+  },
+  muted: {
+    color: '#617487',
+    marginBottom: 8,
+  },
+  editLabel: {
+    color: '#1769aa',
+    fontWeight: 'bold',
+    marginTop: 8,
+    marginBottom: 3,
+  },
+  productImage: {
+    width: 76,
+    height: 76,
+    borderRadius: 8,
+    marginRight: 10,
+    backgroundColor: '#edf3f8',
+  },
+  imagePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: 10,
+    marginVertical: 8,
+    backgroundColor: '#edf3f8',
+  },
+  productAdminRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e3edf6',
+  },
+  item: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#20384f',
+  },
+  qty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  btn: {
+    padding: 10,
+    backgroundColor: '#e7f1fb',
+    borderRadius: 8,
+    margin: 3,
+    alignItems: 'center',
+  },
+  primary: {
+    backgroundColor: '#f28c28',
+    padding: 14,
+    marginTop: 12,
+  },
+  btnText: {
+    fontWeight: 'bold',
+    color: '#12466f',
+  },
+  primaryText: {
+    color: '#fff',
+  },
+  input: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d4e1ed',
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 5,
+    color: '#20384f',
+  },
+  total: {
+    padding: 14,
+    backgroundColor: '#e8f5ed',
+    borderRadius: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#cde8d6',
+  },
+  card: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 10,
+    marginVertical: 7,
+    borderWidth: 1,
+    borderColor: '#e3edf6',
+  },
+  languageOption: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d4e1ed',
+    borderRadius: 10,
+    padding: 15,
+    marginVertical: 6,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectedLanguage: {
+    borderColor: '#1769aa',
+    backgroundColor: '#e7f1fb',
+  },
+  languageText: {
+    color: '#20384f',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  languageMark: {
+    color: '#229954',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+});
+
