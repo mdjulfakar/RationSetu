@@ -925,10 +925,10 @@ export default function App() {
       <View style={styles.nav}>
         {button(t('home'), () => setScreen('home'))}
         {button(t('myOrders'), () => setScreen('myorders'))}
-        {button(
-          t('shopAdmin'),
-          () => setScreen(adminToken ? 'admin' : 'adminlogin'),
-        )}
+        
+
+           
+        
         {button(t('settings'), () => setScreen('settings'))}
       </View>
 
