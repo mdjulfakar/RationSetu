@@ -420,6 +420,166 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
   res.json({ success: true, product: data });
 });
 
+// ================= RATIONSETU NEW SETTINGS =================
+
+// Shop and delivery settings are stored in Supabase Storage.
+// No database table changes are required.
+
+const RATIONSETU_SETTINGS_FILE = "rationsetu-settings.json";
+
+async function getRationSetuSettings() {
+  const bucket =
+    process.env.SUPABASE_PRODUCT_IMAGES_BUCKET || "product-images";
+
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .download(RATIONSETU_SETTINGS_FILE);
+
+  if (error || !data) {
+    return {
+      shop_address: "जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार",
+      shop_lat: null,
+      shop_lng: null,
+      support_phone: "",
+      radius_km: 15,
+      rate_per_km: 7,
+      fixed_extra_fee: 90,
+      delivery_person_share: 60,
+      rationsetu_share: 30
+    };
+  }
+
+  try {
+    return JSON.parse(await data.text());
+  } catch (e) {
+    throw new Error("Saved shop settings could not be read");
+  }
+}
+
+// Straight-line distance between two GPS points.
+function rationsetuDistanceKm(lat1, lon1, lat2, lon2) {
+  const toRad = value => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+
+  return earthRadiusKm * 2 * Math.atan2(
+    Math.sqrt(a),
+    Math.sqrt(1 - a)
+  );
+}
+
+// Public settings for customer app.
+app.get("/api/config", async (req, res) => {
+  try {
+    const settings = await getRationSetuSettings();
+
+    res.json({
+      success: true,
+      shop_address: settings.shop_address,
+      support_phone: settings.support_phone,
+      radius_km: settings.radius_km,
+      rate_per_km: settings.rate_per_km,
+      fixed_extra_fee: settings.fixed_extra_fee,
+      shop_location_ready:
+        Number.isFinite(Number(settings.shop_lat)) &&
+        Number.isFinite(Number(settings.shop_lng))
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// Admin saves shop GPS and customer support number.
+app.post("/api/admin/config", requireAdmin, async (req, res) => {
+  try {
+    const {
+      shop_lat,
+      shop_lng,
+      support_phone,
+      shop_address
+    } = req.body;
+
+    if (
+      !Number.isFinite(Number(shop_lat)) ||
+      !Number.isFinite(Number(shop_lng)) ||
+      Number(shop_lat) < -90 ||
+      Number(shop_lat) > 90 ||
+      Number(shop_lng) < -180 ||
+      Number(shop_lng) > 180
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid shop GPS coordinates are required"
+      });
+    }
+
+    const previous = await getRationSetuSettings();
+
+    const settings = {
+      ...previous,
+      shop_lat: Number(shop_lat),
+      shop_lng: Number(shop_lng),
+      shop_address:
+        shop_address || previous.shop_address,
+      support_phone:
+        support_phone !== undefined
+          ? String(support_phone).trim()
+          : previous.support_phone,
+      radius_km: 15,
+      rate_per_km: 7,
+      fixed_extra_fee: 90,
+      delivery_person_share: 60,
+      rationsetu_share: 30
+    };
+
+    const bucket =
+      process.env.SUPABASE_PRODUCT_IMAGES_BUCKET || "product-images";
+
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(
+        RATIONSETU_SETTINGS_FILE,
+        Buffer.from(JSON.stringify(settings, null, 2)),
+        {
+          contentType: "application/json",
+          upsert: true
+        }
+      );
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Shop location and settings saved",
+      settings
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ================= END NEW SETTINGS =================
+
 // Start server
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
