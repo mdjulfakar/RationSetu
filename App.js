@@ -13,8 +13,9 @@ import {
   Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
+
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator, Image, Linking } from 'react-native';
+
 
 const API_BASE_URL = 'https://rationsetu-service.onrender.com';
 const KEY = 'rationsetu_v1';
