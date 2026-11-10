@@ -20,6 +20,7 @@ import * as Location from 'expo-location';
 
 const API_BASE_URL = 'https://rationsetu-service.onrender.com';
 const KEY = 'rationsetu_v1';
+26.409748, 87.406212
 const LANGUAGE_KEY = 'rationsetu_language';
 
 const initialProducts = [
