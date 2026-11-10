@@ -6,13 +6,8 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/icon.png",
     "android": {
-      "package": "in.rationsetu.app",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0755D9"
-      }
+      "package": "in.rationsetu.app"
     },
     "plugins": [
       [
@@ -26,5 +21,6 @@
     ]
   }
 }
+
 
 
