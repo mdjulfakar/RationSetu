@@ -1269,6 +1269,31 @@ export default function App() {
               {language === 'en' ? '✓' : ''}
             </Text>
           </TouchableOpacity>
+              
+          <View style={{ marginTop: 20, padding: 16, backgroundColor: '#F5F5F5', borderRadius: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>
+              {language === 'hi' ? 'सहायता और संपर्क' : 'Help & Support'}
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => Linking.openURL('https://wa.me/919086305021').catch(() => Alert.alert('Error', 'WhatsApp could not be opened'))}
+              style={{ backgroundColor: '#25D366', padding: 14, borderRadius: 8, marginBottom: 10 }}
+            >
+              <Text style={{ color: '#FFFFFF', textAlign: 'center', fontWeight: 'bold' }}>
+                {language === 'hi' ? 'WhatsApp पर संपर्क करें' : 'Contact on WhatsApp'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => Linking.openURL('tel:+919086305021').catch(() => Alert.alert('Error', 'Calling could not be started'))}
+              style={{ backgroundColor: '#2878D0', padding: 14, borderRadius: 8 }}
+            >
+              <Text style={{ color: '#FFFFFF', textAlign: 'center', fontWeight: 'bold' }}>
+                {language === 'hi' ? 'फोन कॉल करें' : 'Call Support'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+                          
 
           {button(t('goHome'), () => setScreen('home'), true)}
         </ScrollView>
