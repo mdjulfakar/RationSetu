@@ -1,5 +1,4 @@
 
-
 ```javascript
 import React, {useEffect, useMemo, useState} from 'react';
 import {
@@ -20,7 +19,6 @@ import * as Location from 'expo-location';
 
 const API_BASE_URL = 'https://rationsetu-service.onrender.com';
 const KEY = 'rationsetu_v1';
-
 const LANGUAGE_KEY = 'rationsetu_language';
 
 const initialProducts = [
@@ -245,8 +243,8 @@ const money = value => '₹' + Number(value || 0).toFixed(0);
 async function apiRequest(path, options = {}, token = '') {
   let response;
 
-    try {
-    response = await fetch(API_BASE_URL + path, {
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -256,20 +254,7 @@ async function apiRequest(path, options = {}, token = '') {
     });
   } catch (error) {
     throw new Error('इंटरनेट कनेक्शन नहीं मिला। कृपया दोबारा कोशिश करें।');
-
-
-  
-     
-      
-      
-        
-      
-        
-      
-    
-  
-    
-  
+  }
 
   const result = await response.json().catch(() => ({}));
 
@@ -1451,4 +1436,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
 
