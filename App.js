@@ -245,8 +245,8 @@ const money = value => '₹' + Number(value || 0).toFixed(0);
 async function apiRequest(path, options = {}, token = '') {
   let response;
 
-  response = await fetch(API_BASE_URL + path, {
-     {
+    try {
+    response = await fetch(API_BASE_URL + path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -256,7 +256,20 @@ async function apiRequest(path, options = {}, token = '') {
     });
   } catch (error) {
     throw new Error('इंटरनेट कनेक्शन नहीं मिला। कृपया दोबारा कोशिश करें।');
-  }
+
+
+  
+     
+      
+      
+        
+      
+        
+      
+    
+  
+    
+  
 
   const result = await response.json().catch(() => ({}));
 
