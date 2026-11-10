@@ -50,9 +50,11 @@ async function getRationSetuSettings() {
   if (error || !data) {
     return {
       shop_address: "जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार",
-      26.409748, 87.406212
-      shop_lat: null,
-      shop_lng: null,
+      shop_address: "जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार",
+shop_lat: 26.409748,
+shop_lng: 87.406212,
+      
+
       support_phone: "",
       radius_km: 15,
       rate_per_km: 7,
