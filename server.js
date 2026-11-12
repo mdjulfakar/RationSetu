@@ -510,6 +510,34 @@ app.post(
   }
 );
 
+// ================= ADMIN: VIEW ALL PRODUCTS =================
+
+app.get("/api/admin/products", requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("name");
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    res.json({
+      success: true,
+      products: data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // ================= ADMIN: ADD PRODUCT =================
 
 app.post("/api/admin/products", requireAdmin, async (req, res) => {
