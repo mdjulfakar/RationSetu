@@ -1,1 +1,49 @@
-# RationSetu
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RationSetu Admin</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6fb;color:#172033;font:16px system-ui}
+header{background:#155eef;color:white;padding:18px;font-size:21px;font-weight:800}
+main{max-width:850px;margin:20px auto;padding:0 12px}.box,.order{background:white;border-radius:13px;padding:16px;margin:12px 0;box-shadow:0 2px 12px #0001}
+h2{margin:0 0 12px}label{display:block;font-weight:650;margin:12px 0 5px}
+input,select,button{width:100%;padding:12px;border:1px solid #ccd4e0;border-radius:9px;font:inherit;background:white}
+button{background:#155eef;color:white;border:0;font-weight:700;margin-top:12px}
+button.light{background:#e9efff;color:#1649a5}.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1;min-width:130px}
+.hidden{display:none}.msg{margin-top:10px;color:#b42318;overflow-wrap:anywhere}.muted{color:#667085;font-size:14px}
+.order p{margin:5px 0;overflow-wrap:anywhere}.status{color:#155eef;font-weight:700}
+</style></head>
+<body>
+<header>🛒 RationSetu — Admin Panel</header>
+<main>
+<section class="box" id="login">
+<h2>Admin Login</h2><p class="muted">अपने Admin ID और Password से लॉगिन करें।</p>
+<label>Admin ID</label><input id="aid" autocomplete="username" placeholder="Admin ID">
+<label>Password</label><input id="pw" type="password" autocomplete="current-password" placeholder="Password">
+<button id="loginBtn">Login</button><div id="loginMsg" class="msg"></div>
+</section>
+<section id="panel" class="hidden">
+<div class="box"><div class="row"><h2>ऑर्डर / Orders</h2><button id="refresh">Refresh Orders</button><button class="light" id="logout">Logout</button></div>
+<div id="summary" class="muted"></div><div id="orders"></div><div id="ordersMsg" class="msg"></div></div>
+<div class="box"><h2>दुकान की लोकेशन</h2><p class="muted">सही GPS coordinates ही भरें।</p>
+<label>Latitude</label><input id="lat" value="26.409748" inputmode="decimal">
+<label>Longitude</label><input id="lng" value="87.406212" inputmode="decimal">
+<label>दुकान का पता</label><input id="address" value="जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार">
+<label>सहायता मोबाइल नंबर</label><input id="phone" inputmode="tel">
+<button id="save">Save Shop Settings</button><div id="saveMsg" class="msg"></div></div>
+</section></main>
+<script>
+const API='https://rationsetu-service.onrender.com';let token=sessionStorage.getItem('rs_admin')||'';
+const $=x=>document.getElementById(x),headers=()=>({'Authorization':'Bearer '+token,'Content-Type':'application/json'});
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(path,opt={}){let r=await fetch(API+path,opt),d={};try{d=await r.json()}catch{}if(!r.ok||d.success===false)throw Error(d.message||d.error||'Request failed: '+r.status);return d}
+function view(){ $('login').classList.toggle('hidden',!!token);$('panel').classList.toggle('hidden',!token);if(token)loadOrders()}
+$('loginBtn').onclick=async()=>{ $('loginMsg').textContent='लॉगिन हो रहा है…';try{let d=await api('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_id:$('aid').value.trim(),password:$('pw').value})});token=d.token;sessionStorage.setItem('rs_admin',token);$('loginMsg').textContent='';view()}catch(e){$('loginMsg').textContent=e.message}};
+$('logout').onclick=()=>{token='';sessionStorage.removeItem('rs_admin');$('orders').innerHTML='';view()};
+$('refresh').onclick=loadOrders;
+async function loadOrders(){ $('ordersMsg').textContent='लोड हो रहा है…';try{let d=await api('/api/admin/orders',{headers:headers()}),a=d.orders||[];$('summary').textContent='कुल ऑर्डर: '+a.length;$('orders').innerHTML=a.length?a.map(o=>`<article class="order"><b>${esc(o.customer_name)} — ₹${esc(o.total_amount)}</b><p>मोबाइल: ${esc(o.mobile)}</p><p>पता: ${esc(o.address)}</p><p>आइटम: ${esc(JSON.stringify(o.items||[]))}</p><p>स्थिति: <span class="status">${esc(o.status)}</span></p><div class="row"><select id="s${esc(o.id)}">${['Pending','Accepted','Preparing','Out for Delivery','Delivered','Cancelled'].map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select><button onclick="changeStatus('${encodeURIComponent(o.id)}')">स्थिति बदलें</button></div></article>`).join(''):'<p>अभी कोई ऑर्डर नहीं है।</p>';$('ordersMsg').textContent=''}catch(e){$('ordersMsg').textContent=e.message;if(/401|login required/i.test(e.message))$('logout').click()}}
+window.changeStatus=async id=>{try{await api('/api/admin/orders/'+encodeURIComponent(decodeURIComponent(id)),{method:'PATCH',headers:headers(),body:JSON.stringify({status:$('s'+decodeURIComponent(id)).value})});$('ordersMsg').textContent='स्थिति अपडेट हो गई।';loadOrders()}catch(e){$('ordersMsg').textContent=e.message}};
+$('save').onclick=async()=>{ $('saveMsg').textContent='सेव हो रहा है…';try{let d=await api('/api/admin/config',{method:'POST',headers:headers(),body:JSON.stringify({shop_lat:$('lat').value,shop_lng:$('lng').value,shop_address:$('address').value,support_phone:$('phone').value})});$('saveMsg').textContent=d.message||'सेटिंग सेव हो गई।'}catch(e){$('saveMsg').textContent=e.message}};
+view();
+</script></body></html>
