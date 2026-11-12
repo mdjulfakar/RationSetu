@@ -1,4 +1,5 @@
 
+
 <!doctype html>
 <html lang="hi">
 <head>
@@ -35,7 +36,24 @@ button.gray{background:#667085}
 .product-actions{display:flex;gap:7px;flex-wrap:wrap}
 .product-actions button{width:auto;min-width:100px;margin:5px 0 0}
 .preview{max-width:140px;max-height:140px;object-fit:cover;border-radius:9px;margin-top:8px}
-@media(max-width:520px){.product{align-items:flex-start}.product img{width:72px;height:72px}.product-actions button{flex:1}}
+
+/* GPS MAP BUTTON */
+.map-link{
+  display:inline-block;
+  margin:8px 0;
+  padding:10px 14px;
+  background:#e9efff;
+  color:#1649a5;
+  border-radius:9px;
+  font-weight:700;
+  text-decoration:none;
+}
+
+@media(max-width:520px){
+  .product{align-items:flex-start}
+  .product img{width:72px;height:72px}
+  .product-actions button{flex:1}
+}
 </style>
 </head>
 <body>
@@ -268,7 +286,24 @@ window.toggleProduct=async(encodedId,active)=>{
 };
 $('refreshProducts').onclick=loadProducts;
 
-/* ================= EXISTING ORDERS SECTION ================= */
+/* ================= GPS LOCATION FOR EVERY ORDER ================= */
+function orderMapUrl(o){
+  const lat=o.customer_lat;
+  const lng=o.customer_lng;
+
+  const hasCoords=
+    lat!==null&&lat!==undefined&&String(lat).trim()!==''&&
+    lng!==null&&lng!==undefined&&String(lng).trim()!==''&&
+    Number.isFinite(Number(lat))&&Number.isFinite(Number(lng));
+
+  const query=hasCoords
+    ?Number(lat)+','+Number(lng)
+    :String(o.address||'').trim();
+
+  return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(query);
+}
+
+/* ================= ORDERS SECTION ================= */
 $('refresh').onclick=loadOrders;
 async function loadOrders(){
   $('ordersMsg').textContent='लोड हो रहा है…';
@@ -278,7 +313,14 @@ async function loadOrders(){
     $('orders').innerHTML=a.length?a.map(o=>`
       <article class="order">
         <b>${esc(o.customer_name)} — ₹${esc(o.total_amount)}</b>
-        <p>मोबाइल: ${esc(o.mobile)}</p><p>पता: ${esc(o.address)}</p>
+        <p>मोबाइल: ${esc(o.mobile)}</p>
+        <p>पता: ${esc(o.address)}</p>
+
+        <a class="map-link"
+           href="${esc(orderMapUrl(o))}"
+           target="_blank"
+           rel="noopener noreferrer">📍 GPS लोकेशन देखें / Google Maps</a>
+
         <p>आइटम: ${esc(JSON.stringify(o.items||[]))}</p>
         <p>स्थिति: <span class="status">${esc(o.status)}</span></p>
         <div class="row">
@@ -303,7 +345,7 @@ window.changeStatus=async id=>{
   }catch(e){$('ordersMsg').textContent=e.message;}
 };
 
-/* ================= EXISTING SHOP LOCATION SECTION ================= */
+/* ================= SHOP LOCATION SECTION ================= */
 $('save').onclick=async()=>{
   $('saveMsg').textContent='सेव हो रहा है…';
   try{
