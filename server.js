@@ -1,5 +1,4 @@
 
-
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -59,13 +58,12 @@ async function getRationSetuSettings() {
       shop_address: "जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार",
       shop_lat: 26.409748,
       shop_lng: 87.406212,
-
       support_phone: "",
       radius_km: 15,
-      rate_per_km: 7,
-      fixed_extra_fee: 90,
-      delivery_person_share: 60,
-      rationsetu_share: 30
+      delivery_base_charge: 40,
+      delivery_additional_km_charge: 5,
+      platform_fee: 5,
+      weight_surcharge_per_5kg: 10
     };
   }
 
@@ -202,13 +200,13 @@ app.post("/api/orders", async (req, res) => {
       });
     }
 
-    const radiusKm = Number(settings.radius_km) || 15;
-    const ratePerKm = Number(settings.rate_per_km) || 7;
-    const fixedExtraFee = Number(settings.fixed_extra_fee) || 90;
-    const deliveryPersonFixedShare =
-      Number(settings.delivery_person_share) || 60;
-    const rationsetuFixedShare =
-      Number(settings.rationsetu_share) || 30;
+    // ================= NEW RATES =================
+
+    const radiusKm = 15;
+    const deliveryBaseCharge = 40;
+    const additionalKmCharge = 5;
+    const platformFee = 5;
+    const weightSurchargePer5Kg = 10;
 
     const distanceKm = rationsetuDistanceKm(
       Number(settings.shop_lat),
@@ -230,10 +228,49 @@ app.post("/api/orders", async (req, res) => {
 
     const subtotal = Number(total_amount);
 
-    // Distance charge is rounded up to the next rupee.
-    const distanceCharge = Math.ceil(distanceKm * ratePerKm);
-    const deliveryCharge = distanceCharge + fixedExtraFee;
-    const finalTotal = subtotal + deliveryCharge;
+    // Delivery: first 1 KM ₹40, each additional started KM ₹5.
+    // Maximum at 15 KM = ₹110.
+    const chargedDistanceKm = Math.max(1, Math.ceil(distanceKm));
+
+    const deliveryCharge =
+      deliveryBaseCharge + (chargedDistanceKm - 1) * additionalKmCharge;
+
+    // Count only products sold by kilogram.
+    // Litre items are not included in weight.
+    const totalWeightKg = items.reduce((sum, item) => {
+      const unit = String(item.unit || "").trim().toLowerCase();
+      const quantity = Number(item.qty);
+
+      const isKgUnit = [
+        "किलो",
+        "किलोग्राम",
+        "kg",
+        "kgs",
+        "kilogram",
+        "kilograms"
+      ].includes(unit);
+
+      if (isKgUnit && Number.isFinite(quantity) && quantity > 0) {
+        return sum + quantity;
+      }
+
+      return sum;
+    }, 0);
+
+    // Weight surcharge:
+    // 1–5 KG = ₹0
+    // 6–10 KG = ₹10
+    // 11–15 KG = ₹20
+    // 16–20 KG = ₹30
+    // Every next 5 KG adds ₹10.
+    const weightSurcharge =
+      totalWeightKg <= 5
+        ? 0
+        : Math.ceil((totalWeightKg - 5) / 5) * weightSurchargePer5Kg;
+
+    // Final customer payable amount.
+    const finalTotal =
+      subtotal + deliveryCharge + weightSurcharge + platformFee;
 
     const order = {
       customer_name: String(customer_name).trim(),
@@ -241,6 +278,10 @@ app.post("/api/orders", async (req, res) => {
       address: String(address).trim(),
       items,
       total_amount: finalTotal,
+      item_subtotal: subtotal,
+      customer_lat: Number(customer_lat),
+      customer_lng: Number(customer_lng),
+      delivery_distance_km: Number(distanceKm.toFixed(2)),
       payment_method: "COD",
       status: "Pending"
     };
@@ -264,13 +305,13 @@ app.post("/api/orders", async (req, res) => {
       order: data,
       delivery: {
         distance_km: Number(distanceKm.toFixed(2)),
-        rate_per_km: ratePerKm,
-        distance_charge: distanceCharge,
-        fixed_extra_fee: fixedExtraFee,
-        delivery_person_share:
-          deliveryPersonFixedShare + distanceCharge,
-        rationsetu_share: rationsetuFixedShare,
+        charged_distance_km: chargedDistanceKm,
+        delivery_base_charge: deliveryBaseCharge,
+        additional_km_charge: additionalKmCharge,
         delivery_charge: deliveryCharge,
+        total_weight_kg: Number(totalWeightKg.toFixed(2)),
+        weight_surcharge: weightSurcharge,
+        platform_fee: platformFee,
         subtotal,
         payable_total: finalTotal
       }
@@ -676,8 +717,10 @@ app.get("/api/config", async (req, res) => {
       shop_address: settings.shop_address,
       support_phone: settings.support_phone,
       radius_km: settings.radius_km,
-      rate_per_km: settings.rate_per_km,
-      fixed_extra_fee: settings.fixed_extra_fee,
+      delivery_base_charge: 40,
+      delivery_additional_km_charge: 5,
+      platform_fee: 5,
+      weight_surcharge_per_5kg: 10,
       shop_location_ready:
         settings.shop_lat !== null &&
         settings.shop_lng !== null &&
@@ -725,8 +768,17 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
 
     const previous = await getRationSetuSettings();
 
+    // Remove old pricing settings from saved configuration.
+    const {
+      rate_per_km,
+      fixed_extra_fee,
+      delivery_person_share,
+      rationsetu_share,
+      ...previousSettings
+    } = previous;
+
     const settings = {
-      ...previous,
+      ...previousSettings,
       shop_lat: Number(shop_lat),
       shop_lng: Number(shop_lng),
       shop_address: shop_address || previous.shop_address,
@@ -735,10 +787,10 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
           ? String(support_phone).trim()
           : previous.support_phone,
       radius_km: 15,
-      rate_per_km: 7,
-      fixed_extra_fee: 90,
-      delivery_person_share: 60,
-      rationsetu_share: 30
+      delivery_base_charge: 40,
+      delivery_additional_km_charge: 5,
+      platform_fee: 5,
+      weight_surcharge_per_5kg: 10
     };
 
     const bucket =
@@ -782,3 +834,4 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
 });
+
