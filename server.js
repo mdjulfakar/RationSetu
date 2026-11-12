@@ -3,10 +3,17 @@
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
+const path = require("path");
 const { createClient } = require("@supabase/supabase-js");
 require("dotenv").config();
 
 const app = express();
+
+// ================= ADMIN PANEL PAGE =================
+
+app.get("/admin/index.htm", (req, res) => {
+  res.sendFile(path.join(__dirname, "admin", "index.htm"));
+});
 
 app.use(cors());
 app.use(express.json());
@@ -50,10 +57,8 @@ async function getRationSetuSettings() {
   if (error || !data) {
     return {
       shop_address: "जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार",
-      shop_address: "जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार",
-shop_lat: 26.409748,
-shop_lng: 87.406212,
-      
+      shop_lat: 26.409748,
+      shop_lng: 87.406212,
 
       support_phone: "",
       radius_km: 15,
