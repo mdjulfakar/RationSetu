@@ -466,17 +466,11 @@ export default function App() {
     />
   );
 
+  // Header par long-press se Admin Login kholne ka shortcut hata diya gaya hai.
   const header = (
-    <TouchableOpacity
-  activeOpacity={1}
-  delayLongPress={1200}
-  onLongPress={() => setScreen('adminlogin')}
->
-  <Text style={styles.brand}>🛒 RationSetu</Text>
-</TouchableOpacity>
-
-    
-      
+    <View style={styles.header}>
+      <Text style={styles.brand}>🛒 RationSetu</Text>
+    </View>
   );
 
   function changeQuantity(id, difference) {
@@ -733,8 +727,7 @@ export default function App() {
 
     const response = await fetch(
       `${API_BASE_URL}/api/admin/products/upload-image`,
-      {
-        method: 'POST',
+      {         method: 'POST',
         headers: {
           Authorization: `Bearer ${adminToken}`,
         },
@@ -928,10 +921,6 @@ export default function App() {
       <View style={styles.nav}>
         {button(t('home'), () => setScreen('home'))}
         {button(t('myOrders'), () => setScreen('myorders'))}
-        
-
-           
-        
         {button(t('settings'), () => setScreen('settings'))}
       </View>
 
@@ -950,30 +939,44 @@ export default function App() {
 
           {field(search, setSearch, t('search'))}
 
-          {items.map(product => (
-            <View key={product.id} style={styles.row}>
-              {product.image_url ? (
-                <Image
-                  source={{uri: product.image_url}}
-                  style={styles.productImage}
-                />
-              ) : null}
+          {/* Customer products: responsive 3-column grid */}
+          <View style={styles.productGrid}>
+            {items.map(product => (
+              <View key={product.id} style={styles.productGridCard}>
+                {product.image_url ? (
+                  <Image
+                    source={{uri: product.image_url}}
+                    style={styles.productGridImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.productGridImagePlaceholder}>
+                    <Text style={styles.item}>📦</Text>
+                  </View>
+                )}
 
-              <View style={{flex: 1}}>
-                <Text style={styles.item}>{productLabel(product)}</Text>
-                <Text style={styles.muted}>
-                  {money(product.price)} / {unitLabel(product.unit)} · {t('available')}:{' '}
-                  {product.stock}
+                <Text style={styles.productGridName}>
+                  {productLabel(product)}
                 </Text>
-              </View>
 
-              <View style={styles.qty}>
-                {button('−', () => changeQuantity(product.id, -1))}
-                <Text style={styles.item}>{cart[product.id] || 0}</Text>
-                {button('+', () => changeQuantity(product.id, 1))}
+                <Text style={styles.productGridPrice}>
+                  {money(product.price)} / {unitLabel(product.unit)}
+                </Text>
+
+                <Text style={styles.productGridStock}>
+                  {t('available')}: {product.stock}
+                </Text>
+
+                <View style={styles.productGridQty}>
+                  {button('−', () => changeQuantity(product.id, -1))}
+                  <Text style={styles.item}>
+                    {cart[product.id] || 0}
+                  </Text>
+                  {button('+', () => changeQuantity(product.id, 1))}
+                </View>
               </View>
-            </View>
-          ))}
+            ))}
+          </View>
 
           {items.length === 0 && (
             <Text style={styles.muted}>{t('noProduct')}</Text>
@@ -1272,7 +1275,7 @@ export default function App() {
               {language === 'en' ? '✓' : ''}
             </Text>
           </TouchableOpacity>
-              
+
           <View style={{ marginTop: 20, padding: 16, backgroundColor: '#F5F5F5', borderRadius: 12 }}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>
               {language === 'hi' ? 'सहायता और संपर्क' : 'Help & Support'}
@@ -1296,7 +1299,6 @@ export default function App() {
               </Text>
             </TouchableOpacity>
           </View>
-                          
 
           {button(t('goHome'), () => setScreen('home'), true)}
         </ScrollView>
@@ -1359,6 +1361,63 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 3,
   },
+
+  // Three product cards per row on mobile.
+  productGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  productGridCard: {
+    width: '31.8%',
+    padding: 7,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e3edf6',
+  },
+  productGridImage: {
+    width: '100%',
+    height: 90,
+    borderRadius: 7,
+    marginBottom: 6,
+    backgroundColor: '#edf3f8',
+  },
+  productGridImagePlaceholder: {
+    width: '100%',
+    height: 90,
+    borderRadius: 7,
+    marginBottom: 6,
+    backgroundColor: '#edf3f8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productGridName: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#20384f',
+    minHeight: 34,
+  },
+  productGridPrice: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1769aa',
+    marginTop: 4,
+  },
+  productGridStock: {
+    fontSize: 11,
+    color: '#617487',
+    marginTop: 3,
+  },
+  productGridQty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 5,
+  },
+
   productImage: {
     width: 76,
     height: 76,
@@ -1467,5 +1526,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-
-
