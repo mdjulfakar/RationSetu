@@ -529,9 +529,10 @@ export default function App() {
     />
   );
 
-  const header = (
+    const header = (
     <View style={styles.header}>
       <Text style={styles.brand}>🛒 RationSetu</Text>
+      <Text style={styles.sub}>{t('tagline')}</Text>
       <Text style={styles.connection}>
         {isOnline ? t('online') : t('offline')}
       </Text>
