@@ -652,8 +652,7 @@ export default function App() {
       Alert.alert(t('orderFailed'), error.message);
     } finally {
       setLoading(false);
-  
-  }
+    }
 
   // Admin login through backend.
   async function adminLogin() {
