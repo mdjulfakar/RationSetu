@@ -652,20 +652,7 @@ export default function App() {
       Alert.alert(t('orderFailed'), error.message);
     } finally {
       setLoading(false);
-    }
-  } ..previous,
-        orders: [savedOrder, ...previous.orders],
-      }));
-
-      setCart({});
-      setScreen('success');
-
-      Alert.alert(t('orderSuccessTitle'), t('orderServerSuccess'));
-    } catch (error) {
-      Alert.alert(t('orderFailed'), error.message);
-    } finally {
-      setLoading(false);
-    }
+  
   }
 
   // Admin login through backend.
