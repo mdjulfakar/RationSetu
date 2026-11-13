@@ -1,3 +1,5 @@
+
+
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -145,7 +147,6 @@ app.post("/api/orders", async (req, res) => {
       customer_lng
     } = req.body;
 
-    // Validate customer and order details.
     if (
       !String(customer_name || "").trim() ||
       !/^[0-9]{10}$/.test(String(mobile || "").trim()) ||
@@ -161,7 +162,6 @@ app.post("/api/orders", async (req, res) => {
       });
     }
 
-    // GPS is compulsory for checking the 15 KM service area.
     if (
       customer_lat === undefined ||
       customer_lng === undefined ||
@@ -183,7 +183,6 @@ app.post("/api/orders", async (req, res) => {
 
     const settings = await getRationSetuSettings();
 
-    // Admin must save the shop GPS location before orders are accepted.
     if (
       settings.shop_lat === null ||
       settings.shop_lng === null ||
@@ -214,7 +213,6 @@ app.post("/api/orders", async (req, res) => {
       Number(customer_lng)
     );
 
-    // Block orders outside the permitted radius.
     if (distanceKm > radiusKm) {
       return res.status(403).json({
         success: false,
@@ -227,15 +225,11 @@ app.post("/api/orders", async (req, res) => {
 
     const subtotal = Number(total_amount);
 
-    // Delivery: first 1 KM ₹40, each additional started KM ₹5.
-    // Maximum at 15 KM = ₹110.
     const chargedDistanceKm = Math.max(1, Math.ceil(distanceKm));
 
     const deliveryCharge =
       deliveryBaseCharge + (chargedDistanceKm - 1) * additionalKmCharge;
 
-    // Count only products sold by kilogram.
-    // Litre items are not included in weight.
     const totalWeightKg = items.reduce((sum, item) => {
       const unit = String(item.unit || "").trim().toLowerCase();
       const quantity = Number(item.qty);
@@ -256,18 +250,11 @@ app.post("/api/orders", async (req, res) => {
       return sum;
     }, 0);
 
-    // Weight surcharge:
-    // 1–5 KG = ₹0
-    // 6–10 KG = ₹10
-    // 11–15 KG = ₹20
-    // 16–20 KG = ₹30
-    // Every next 5 KG adds ₹10.
     const weightSurcharge =
       totalWeightKg <= 5
         ? 0
         : Math.ceil((totalWeightKg - 5) / 5) * weightSurchargePer5Kg;
 
-    // Final customer payable amount.
     const finalTotal =
       subtotal + deliveryCharge + weightSurcharge + platformFee;
 
@@ -379,7 +366,7 @@ app.get("/api/admin/orders", requireAdmin, async (req, res) => {
   }
 });
 
-// ================= ADMIN: UPDATE ORDER STATUS =================
+// ================= ADMIN: UPDATE ORDER STATUS + HISTORY =================
 
 app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
   try {
@@ -415,9 +402,23 @@ app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
       });
     }
 
+    const { error: historyError } = await supabase
+      .from("order_status_history")
+      .insert({
+        order_id: data.id,
+        status: status,
+        note: "Order status updated by admin",
+        changed_by: "admin"
+      });
+
+    if (historyError) {
+      console.error("Order history save failed:", historyError.message);
+    }
+
     res.json({
       success: true,
-      order: data
+      order: data,
+      history_saved: !historyError
     });
   } catch (error) {
     res.status(500).json({
@@ -767,7 +768,6 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
 
     const previous = await getRationSetuSettings();
 
-    // Remove old pricing settings from saved configuration.
     const {
       rate_per_km,
       fixed_extra_fee,
@@ -830,7 +830,6 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
 
 // ================= APP PRESENCE / HEARTBEAT =================
 
-// Keep a short-lived record of clients that have recently contacted the server.
 const presenceClients = new Map();
 
 app.post("/api/presence/heartbeat", (req, res) => {
@@ -850,7 +849,6 @@ app.post("/api/presence/heartbeat", (req, res) => {
   const now = Date.now();
   presenceClients.set(clientId, now);
 
-  // Remove stale client records to keep memory usage limited.
   for (const [id, lastSeen] of presenceClients.entries()) {
     if (now - lastSeen > 90 * 1000) {
       presenceClients.delete(id);
