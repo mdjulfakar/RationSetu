@@ -712,7 +712,8 @@ export default function App() {
           ...result.order,
           customer_order_token:
             result.order.customer_order_token || order.customerOrderToken,
-        });
+       history: result.history || [],
+        }) 
         setData(previous => ({
           ...previous,
           orders: previous.orders.map(item =>
