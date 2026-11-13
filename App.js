@@ -1367,24 +1367,30 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#f3f7fc',
-  },
-  header: {
+    header: {
     backgroundColor: '#1769aa',
-    padding: 18,
+    minHeight: 142,
+    paddingHorizontal: 22,
+    paddingVertical: 20,
+    justifyContent: 'center',
   },
   brand: {
     color: '#fff',
-    fontSize: 25,
+    fontSize: 31,
     fontWeight: 'bold',
   },
   sub: {
     color: '#e8f2fb',
-    marginTop: 3,
+    marginTop: 5,
+    fontSize: 16,
+    fontWeight: '500',
   },
   connection: {
     color: '#e8f2fb',
-    marginTop: 6,
-    fontSize: 12,
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   },
   nav: {
     flexDirection: 'row',
