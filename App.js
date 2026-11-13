@@ -653,7 +653,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-
+  } 
   // Admin login through backend.
   async function adminLogin() {
     if (!adminId.trim() || !adminPassword.trim()) {
