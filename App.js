@@ -653,7 +653,22 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }   // Admin login through backend.
+  } ..previous,
+        orders: [savedOrder, ...previous.orders],
+      }));
+
+      setCart({});
+      setScreen('success');
+
+      Alert.alert(t('orderSuccessTitle'), t('orderServerSuccess'));
+    } catch (error) {
+      Alert.alert(t('orderFailed'), error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Admin login through backend.
   async function adminLogin() {
     if (!adminId.trim() || !adminPassword.trim()) {
       Alert.alert(t('infoIncomplete'), t('adminInfo'));
@@ -1097,201 +1112,6 @@ export default function App() {
         </ScrollView>
       )}
 
-      {screen === 'adminlogin' && (
-        <ScrollView style={styles.body}>
-          <Text style={styles.title}>{t('adminLogin')}</Text>
-          {field(adminId, setAdminId, t('adminId'))}
-
-          {field(
-            adminPassword,
-            setAdminPassword,
-            t('adminPassword'),
-            'default',
-            true,
-          )}
-
-          {button(t('adminLogin'), adminLogin, true, loading)}
-        </ScrollView>
-      )}
-
-      {screen === 'admin' && (
-        <ScrollView style={styles.body}>
-          <Text style={styles.title}>{t('adminPanel')}</Text>
-
-          <Text style={styles.muted}>
-            {t('orderCount')}: {data.orders.length}
-          </Text>
-
-          {button(t('refreshOrders'), () => loadAdminOrders())}
-
-          <Text style={styles.item}>{t('addProductTitle')}</Text>
-
-          {field(newName, setNewName, t('productName'))}
-          {field(newPrice, setNewPrice, t('price'), 'numeric')}
-          {field(newStock, setNewStock, t('stock'), 'numeric')}
-
-          {newImage ? (
-            <Image
-              source={{uri: newImage.uri}}
-              style={styles.imagePreview}
-            />
-          ) : null}
-
-          {button(t('choosePhoto'), selectNewProductImage, false, loading)}
-          {button(t('addProduct'), addProduct, true, loading)}
-
-          <Text style={styles.item}>
-            {t('productImage')} · {t('replacePhoto')}
-          </Text>
-
-          {data.products.map(product => (
-            <View key={product.id} style={styles.card}>
-              <View style={styles.productAdminRow}>
-                {product.image_url ? (
-                  <Image
-                    source={{uri: product.image_url}}
-                    style={styles.productImage}
-                  />
-                ) : null}
-
-                <View style={{flex: 1}}>
-                  <Text style={styles.item}>{productLabel(product)}</Text>
-
-                  <Text style={styles.muted}>
-                    {money(product.price)} · {t('stock')}: {product.stock}
-                  </Text>
-
-                  <Text style={styles.editLabel}>
-                    {t('editPriceStock')}
-                  </Text>
-
-                  {field(
-                    editingProducts[product.id]?.price ?? String(product.price),
-                    value =>
-                      setEditingProducts(previous => ({
-                        ...previous,
-                        [product.id]: {
-                          ...previous[product.id],
-                          price: value,
-                        },
-                      })),
-                    t('price'),
-                    'numeric',
-                  )}
-
-                  {field(
-                    editingProducts[product.id]?.stock ?? String(product.stock),
-                    value =>
-                      setEditingProducts(previous => ({
-                        ...previous,
-                        [product.id]: {
-                          ...previous[product.id],
-                          stock: value,
-                        },
-                      })),
-                    t('stock'),
-                    'numeric',
-                  )}
-
-                  {button(
-                    t('saveChanges'),
-                    () => saveProductPriceStock(product),
-                    true,
-                    loading,
-                  )}
-
-                  {button(
-                    uploadingPhotoId === product.id
-                      ? t('wait')
-                      : t('replacePhoto'),
-                    () => replaceProductImage(product),
-                    false,
-                    loading || !!uploadingPhotoId,
-                  )}
-                </View>
-              </View>
-            </View>
-          ))}
-
-          <Text style={styles.title}>{t('allOrders')}</Text>
-
-          {data.orders.length === 0 && (
-            <Text style={styles.muted}>{t('noOrders')}</Text>
-          )}
-
-          {data.orders.map(order => (
-            <View style={styles.card} key={order.id}>
-              <Text style={styles.item}>
-                {order.id} · {order.customer}
-              </Text>
-
-              <Text>{order.phone} · {order.address}</Text>
-
-              <Text>
-                {order.items.map(item =>
-                  `${item.name} × ${item.qty}`,
-                ).join(', ')}
-              </Text>
-
-              <Text>
-                {money(order.total)} · {order.payment}
-              </Text>
-
-              <Text style={styles.muted}>
-                {t('status')}: {statusLabel(order.status)}
-              </Text>
-
-              {button(t('accept'), () =>
-                updateOrderStatus(order.id, 'Accepted'),
-              )}
-
-              {button(t('delivered'), () =>
-                updateOrderStatus(order.id, 'Delivered'),
-              )}
-
-              {button(t('cancel'), () =>
-                updateOrderStatus(order.id, 'Cancelled'),
-              )}
-            </View>
-          ))}
-
-          <Text style={styles.title}>{t('shopInfo')}</Text>
-
-          {field(
-            data.shop.name,
-            value =>
-              setData(previous => ({
-                ...previous,
-                shop: {...previous.shop, name: value},
-              })),
-            t('shopName'),
-          )}
-
-          {field(
-            data.shop.phone,
-            value =>
-              setData(previous => ({
-                ...previous,
-                shop: {...previous.shop, phone: value},
-              })),
-            t('shopPhone'),
-            'phone-pad',
-          )}
-
-          {field(
-            data.shop.address,
-            value =>
-              setData(previous => ({
-                ...previous,
-                shop: {...previous.shop, address: value},
-              })),
-            t('shopAddress'),
-          )}
-
-          {button(t('logout'), logoutAdmin)}
-        </ScrollView>
-      )}
-
       {screen === 'settings' && (
         <ScrollView style={styles.body}>
           <Text style={styles.title}>{t('settings')}</Text>
@@ -1367,30 +1187,30 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#f3f7fc',
-    header: {
+  },
+  header: {
     backgroundColor: '#1769aa',
-    minHeight: 142,
+    minHeight: 160,
     paddingHorizontal: 22,
-    paddingVertical: 20,
+    paddingVertical: 24,
     justifyContent: 'center',
   },
   brand: {
     color: '#fff',
-    fontSize: 31,
+    fontSize: 34,
     fontWeight: 'bold',
   },
   sub: {
     color: '#e8f2fb',
-    marginTop: 5,
-    fontSize: 16,
+    marginTop: 6,
+    fontSize: 17,
     fontWeight: '500',
   },
   connection: {
     color: '#e8f2fb',
-    marginTop: 8,
+    marginTop: 9,
     fontSize: 14,
     fontWeight: '600',
-  },
   },
   nav: {
     flexDirection: 'row',
