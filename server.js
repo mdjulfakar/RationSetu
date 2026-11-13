@@ -1,5 +1,4 @@
 
-
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -16,7 +15,7 @@ app.get("/admin/index.htm", (req, res) => {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -40,6 +39,84 @@ function requireAdmin(req, res, next) {
   }
 
   next();
+}
+
+// ================= CUSTOMER ORDER SECURITY =================
+// Customer does not search by mobile, enter OTP, or enter a PIN.
+// The app silently stores the returned token with that order on this phone.
+// The token is deterministic HMAC signed with a private server secret, so
+// no extra database table or paid service is required.
+
+function customerOrderSecret() {
+  return (
+    process.env.CUSTOMER_ORDER_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    ""
+  );
+}
+
+function makeCustomerOrderToken(orderId) {
+  const secret = customerOrderSecret();
+
+  if (!secret) {
+    throw new Error("Customer order security secret is not configured");
+  }
+
+  return crypto
+    .createHmac("sha256", secret)
+    .update("rationsetu-customer-order:" + String(orderId))
+    .digest("hex");
+}
+
+function safeTokenEqual(a, b) {
+  if (
+    typeof a !== "string" ||
+    typeof b !== "string" ||
+    !/^[a-f0-9]{64}$/i.test(a) ||
+    !/^[a-f0-9]{64}$/i.test(b)
+  ) {
+    return false;
+  }
+
+  const first = Buffer.from(a, "hex");
+  const second = Buffer.from(b, "hex");
+
+  return (
+    first.length === second.length &&
+    crypto.timingSafeEqual(first, second)
+  );
+}
+
+function requireCustomerOrderAccess(req, res, next) {
+  try {
+    const orderId = String(req.params.id || "").trim();
+    const suppliedToken = String(
+      req.headers.authorization || ""
+    ).replace(/^Bearer\s+/i, "").trim();
+
+    if (!orderId || !suppliedToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Order access is not available on this device."
+      });
+    }
+
+    const expectedToken = makeCustomerOrderToken(orderId);
+
+    if (!safeTokenEqual(suppliedToken, expectedToken)) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to access this order."
+      });
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
 }
 
 // ================= SHOP SETTINGS =================
@@ -139,7 +216,6 @@ app.post("/api/orders", async (req, res) => {
   try {
     const {
       customer_name,
-      mobile,
       address,
       items,
       total_amount,
@@ -149,7 +225,6 @@ app.post("/api/orders", async (req, res) => {
 
     if (
       !String(customer_name || "").trim() ||
-      !/^[0-9]{10}$/.test(String(mobile || "").trim()) ||
       !String(address || "").trim() ||
       !Array.isArray(items) ||
       items.length === 0 ||
@@ -158,7 +233,7 @@ app.post("/api/orders", async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Please provide customer name, valid mobile, full address and order items."
+        message: "Please provide customer name, full address and order items."
       });
     }
 
@@ -198,8 +273,7 @@ app.post("/api/orders", async (req, res) => {
       });
     }
 
-    // ================= NEW RATES =================
-
+    // Existing delivery rates are preserved.
     const radiusKm = 15;
     const deliveryBaseCharge = 40;
     const additionalKmCharge = 5;
@@ -224,7 +298,6 @@ app.post("/api/orders", async (req, res) => {
     }
 
     const subtotal = Number(total_amount);
-
     const chargedDistanceKm = Math.max(1, Math.ceil(distanceKm));
 
     const deliveryCharge =
@@ -260,7 +333,9 @@ app.post("/api/orders", async (req, res) => {
 
     const order = {
       customer_name: String(customer_name).trim(),
-      mobile: String(mobile).trim(),
+      // Keep the existing database column compatible, but do not require,
+      // display, search by, or use a customer's mobile number for access.
+      mobile: "",
       address: String(address).trim(),
       items,
       total_amount: finalTotal,
@@ -285,10 +360,28 @@ app.post("/api/orders", async (req, res) => {
       });
     }
 
+    // Token is returned once to the app and saved invisibly with this order.
+    // The customer never types it and never searches for the order.
+    const customer_order_token = makeCustomerOrderToken(data.id);
+
+    const { error: historyError } = await supabase
+      .from("order_status_history")
+      .insert({
+        order_id: data.id,
+        status: "Pending",
+        note: "Order placed by customer",
+        changed_by: "customer"
+      });
+
+    if (historyError) {
+      console.error("Initial order history save failed:", historyError.message);
+    }
+
     return res.status(201).json({
       success: true,
       message: "Order placed successfully",
       order: data,
+      customer_order_token,
       delivery: {
         distance_km: Number(distanceKm.toFixed(2)),
         charged_distance_km: chargedDistanceKm,
@@ -309,7 +402,150 @@ app.post("/api/orders", async (req, res) => {
       message: error.message || "Order could not be placed."
     });
   }
-});
+}); // ================= CUSTOMER: VIEW ONE SAVED ORDER STATUS =================
+// Called silently from the matching card in My Orders. No order search screen.
+
+app.get(
+  "/api/orders/:id/status",
+  requireCustomerOrderAccess,
+  async (req, res) => {
+    try {
+      const { data: order, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", req.params.id)
+        .maybeSingle();
+
+      if (error) {
+        return res.status(500).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found"
+        });
+      }
+
+      const { data: history, error: historyError } = await supabase
+        .from("order_status_history")
+        .select("*")
+        .eq("order_id", order.id)
+        .order("created_at", { ascending: true });
+
+      if (historyError) {
+        console.error("Order history read failed:", historyError.message);
+      }
+
+      return res.json({
+        success: true,
+        order,
+        history: history || []
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+);
+
+// ================= CUSTOMER: CANCEL OWN ORDER =================
+// Customer can cancel before delivery. Authorization uses the hidden token
+// saved with that order on the same phone, not the mobile number.
+
+app.patch(
+  "/api/orders/:id/cancel",
+  requireCustomerOrderAccess,
+  async (req, res) => {
+    try {
+      const { data: existing, error: findError } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", req.params.id)
+        .maybeSingle();
+
+      if (findError) {
+        return res.status(500).json({
+          success: false,
+          message: findError.message
+        });
+      }
+
+      if (!existing) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found"
+        });
+      }
+
+      if (existing.status === "Delivered") {
+        return res.status(409).json({
+          success: false,
+          message: "Delivered orders cannot be cancelled."
+        });
+      }
+
+      if (existing.status === "Cancelled") {
+        return res.json({
+          success: true,
+          message: "This order is already cancelled.",
+          order: existing
+        });
+      }
+
+      const { data: updated, error: updateError } = await supabase
+        .from("orders")
+        .update({ status: "Cancelled" })
+        .eq("id", req.params.id)
+        .neq("status", "Delivered")
+        .select()
+        .maybeSingle();
+
+      if (updateError) {
+        return res.status(500).json({
+          success: false,
+          message: updateError.message
+        });
+      }
+
+      if (!updated) {
+        return res.status(409).json({
+          success: false,
+          message: "This order can no longer be cancelled."
+        });
+      }
+
+      const { error: historyError } = await supabase
+        .from("order_status_history")
+        .insert({
+          order_id: updated.id,
+          status: "Cancelled",
+          note: "Order cancelled by customer",
+          changed_by: "customer"
+        });
+
+      if (historyError) {
+        console.error("Customer cancellation history save failed:", historyError.message);
+      }
+
+      return res.json({
+        success: true,
+        message: "Order cancelled successfully",
+        order: updated
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+  }
+);
 
 // ================= ADMIN: LOGIN =================
 
@@ -549,9 +785,7 @@ app.post(
       });
     }
   }
-);
-
-// ================= ADMIN: VIEW ALL PRODUCTS =================
+); // ================= ADMIN: VIEW ALL PRODUCTS =================
 
 app.get("/api/admin/products", requireAdmin, async (req, res) => {
   try {
