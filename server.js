@@ -335,7 +335,7 @@ app.post("/api/orders", async (req, res) => {
       customer_name: String(customer_name).trim(),
       // Keep the existing database column compatible, but do not require,
       // display, search by, or use a customer's mobile number for access.
-      mobile: String(mobile || "").trim(),
+      mobile: String(req.body.mobile || "").trim(),
       address: String(address).trim(),
       items,
       total_amount: finalTotal,
