@@ -1,3 +1,4 @@
+
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
@@ -21,8 +22,10 @@ const API_BASE_URL = 'https://rationsetu-service.onrender.com';
 const KEY = 'rationsetu_v1';
 const LANGUAGE_KEY = 'rationsetu_language';
 const PRESENCE_CLIENT_KEY = 'rationsetu_presence_client_id';
-
 const HEARTBEAT_INTERVAL = 30000;
+
+const SUPPORT_PHONE = '+919086305021';
+const SUPPORT_EMAIL = 'zulfakar281@gmail.com';
 
 const initialProducts = [
   {id: 'p1', name: 'चावल', unit: 'किलो', price: 38, stock: 500},
@@ -36,7 +39,6 @@ const initialProducts = [
 const translations = {
   hi: {
     tagline: 'आपका राशन, आपके घर तक!',
-    serverCheck: '⚠️ सर्वर कनेक्शन जाँचें',
     online: '🟢 ऑनलाइन सेवा',
     offline: '🔴 ऑफलाइन सेवा',
     home: 'होम',
@@ -45,8 +47,6 @@ const translations = {
     settings: 'सेटिंग्स',
     language: 'भाषा',
     chooseLanguage: 'अपनी पसंद की भाषा चुनें',
-    hindi: 'हिन्दी',
-    english: 'English',
     savedLanguage: 'भाषा सेव हो गई।',
     wait: 'कृपया इंतजार करें...',
     orderTitle: 'राशन और किराना ऑर्डर करें',
@@ -65,7 +65,7 @@ const translations = {
     orderSaved: 'आपका ऑर्डर ऑनलाइन दुकान के सर्वर पर सेव हो गया है।',
     goHome: 'होम पर जाएँ',
     seeOrders: 'मेरे ऑर्डर देखें',
-    noOrderForPhone: 'इस फोन में इस मोबाइल नंबर का कोई ऑर्डर रिकॉर्ड नहीं मिला।',
+    noOrderForPhone: 'अभी इस फोन में कोई ऑर्डर रिकॉर्ड नहीं है।',
     adminLogin: 'दुकान एडमिन लॉगिन',
     adminId: 'Admin ID',
     adminPassword: 'Admin Password',
@@ -80,13 +80,12 @@ const translations = {
     allOrders: 'सभी ऑनलाइन ऑर्डर',
     noOrders: 'अभी कोई ऑर्डर नहीं आया है।',
     status: 'स्थिति',
-    accept: 'ऑर्डर स्वीकार करें',
+    accept: 'स्वीकार करें',
+    preparing: 'तैयारी में',
+    outForDelivery: 'डिलीवरी के लिए निकला',
     delivered: 'डिलीवरी पूरी',
     cancel: 'ऑर्डर रद्द करें',
     shopInfo: 'दुकान की जानकारी',
-    shopName: 'दुकान का नाम',
-    shopPhone: 'दुकान मोबाइल नंबर',
-    shopAddress: 'दुकान का पता',
     logout: 'Admin Logout',
     infoIncomplete: 'जानकारी अधूरी',
     fillName: 'कृपया ग्राहक का नाम भरें।',
@@ -121,21 +120,38 @@ const translations = {
     productAddFailed: 'सामान नहीं जुड़ा',
     logoutSuccess: 'Admin Logout हो गया।',
     internetError: 'इंटरनेट कनेक्शन नहीं मिला। कृपया दोबारा कोशिश करें।',
-    serverConnection: 'सर्वर कनेक्शन',
     kilo: 'किलो',
     litre: 'लीटर',
     pending: 'लंबित',
     accepted: 'स्वीकार किया गया',
+    preparingStatus: 'तैयारी में',
+    outForDeliveryStatus: 'डिलीवरी के लिए निकला',
     deliveredStatus: 'डिलीवर हो गया',
     cancelled: 'रद्द',
     editPriceStock: 'कीमत और स्टॉक बदलें',
     saveChanges: 'बदलाव सेव करें',
     changesSaved: 'कीमत और स्टॉक अपडेट हो गए।',
     changesFailed: 'कीमत और स्टॉक अपडेट नहीं हुए।',
+    refreshStatus: 'स्टेटस देखें',
+    cancelOrder: 'ऑर्डर कैंसिल करें',
+    cancelConfirm: 'क्या आप यह ऑर्डर कैंसिल करना चाहते हैं?',
+    orderCancelled: 'ऑर्डर कैंसिल हो गया।',
+    cannotCancel: 'यह ऑर्डर अब कैंसिल नहीं किया जा सकता।',
+    helpSupport: 'सहायता और संपर्क',
+    contactWhatsApp: 'WhatsApp पर संपर्क करें',
+    callSupport: 'फोन कॉल करें',
+    emailSupport: 'ईमेल सहायता',
+    orderHistory: 'ऑर्डर हिस्ट्री',
+    customer: 'ग्राहक',
+    address: 'पता',
+    items: 'सामान',
+    payment: 'भुगतान',
+    adminOrders: 'ऑर्डर मैनेजमेंट',
+    productManagement: 'सामान मैनेजमेंट',
+    emailOpenError: 'ईमेल ऐप नहीं खुल पाया।',
   },
   en: {
     tagline: 'Your groceries, delivered to your home!',
-    serverCheck: '⚠️ Check server connection',
     online: '🟢 Online service',
     offline: '🔴 Offline service',
     home: 'Home',
@@ -144,8 +160,6 @@ const translations = {
     settings: 'Settings',
     language: 'Language',
     chooseLanguage: 'Choose your preferred language',
-    hindi: 'हिन्दी',
-    english: 'English',
     savedLanguage: 'Language preference saved.',
     wait: 'Please wait...',
     orderTitle: 'Order groceries and essentials',
@@ -164,7 +178,7 @@ const translations = {
     orderSaved: 'Your order has been saved on the online shop server.',
     goHome: 'Go to Home',
     seeOrders: 'View My Orders',
-    noOrderForPhone: 'No order record found for this mobile number on this phone.',
+    noOrderForPhone: 'There are no saved orders on this phone yet.',
     adminLogin: 'Shop Admin Login',
     adminId: 'Admin ID',
     adminPassword: 'Admin Password',
@@ -179,13 +193,12 @@ const translations = {
     allOrders: 'All Online Orders',
     noOrders: 'No orders have arrived yet.',
     status: 'Status',
-    accept: 'Accept Order',
+    accept: 'Accept',
+    preparing: 'Preparing',
+    outForDelivery: 'Out for delivery',
     delivered: 'Mark Delivered',
     cancel: 'Cancel Order',
     shopInfo: 'Shop Information',
-    shopName: 'Shop name',
-    shopPhone: 'Shop mobile number',
-    shopAddress: 'Shop address',
     logout: 'Admin Logout',
     infoIncomplete: 'Missing information',
     fillName: 'Please enter the customer name.',
@@ -220,17 +233,35 @@ const translations = {
     productAddFailed: 'Could not add product',
     logoutSuccess: 'Admin logged out.',
     internetError: 'No internet connection. Please try again.',
-    serverConnection: 'Server connection',
     kilo: 'kg',
     litre: 'litre',
     pending: 'Pending',
     accepted: 'Accepted',
+    preparingStatus: 'Preparing',
+    outForDeliveryStatus: 'Out for delivery',
     deliveredStatus: 'Delivered',
     cancelled: 'Cancelled',
     editPriceStock: 'Edit Price and Stock',
     saveChanges: 'Save Changes',
     changesSaved: 'Price and stock updated successfully.',
     changesFailed: 'Price and stock could not be updated.',
+    refreshStatus: 'Refresh Status',
+    cancelOrder: 'Cancel Order',
+    cancelConfirm: 'Do you want to cancel this order?',
+    orderCancelled: 'Order cancelled.',
+    cannotCancel: 'This order can no longer be cancelled.',
+    helpSupport: 'Help & Support',
+    contactWhatsApp: 'Contact on WhatsApp',
+    callSupport: 'Call Support',
+    emailSupport: 'Email Support',
+    orderHistory: 'Order History',
+    customer: 'Customer',
+    address: 'Address',
+    items: 'Items',
+    payment: 'Payment',
+    adminOrders: 'Order Management',
+    productManagement: 'Product Management',
+    emailOpenError: 'Could not open the email app.',
   },
 };
 
@@ -247,7 +278,6 @@ const money = value => '₹' + Number(value || 0).toFixed(0);
 
 async function apiRequest(path, options = {}, token = '') {
   let response;
-
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
@@ -262,13 +292,11 @@ async function apiRequest(path, options = {}, token = '') {
   }
 
   const result = await response.json().catch(() => ({}));
-
   if (!response.ok) {
     throw new Error(
       result.message || result.error || `Server Error ${response.status}`,
     );
   }
-
   return result;
 }
 
@@ -295,6 +323,13 @@ function normalizeOrder(order) {
     payment: order.payment_method || order.payment || 'COD',
     items: Array.isArray(order.items) ? order.items : [],
     createdAt: order.created_at || order.createdAt || '',
+    customerOrderToken:
+      order.customerOrderToken || order.customer_order_token || '',
+    statusHistory: Array.isArray(order.statusHistory)
+      ? order.statusHistory
+      : Array.isArray(order.history)
+        ? order.history
+        : [],
   };
 }
 
@@ -311,7 +346,8 @@ export default function App() {
 
   const [screen, setScreen] = useState('home');
   const [language, setLanguage] = useState('hi');
-  const t = key => translations[language]?.[key] || translations.hi[key] || key;
+  const t = key =>
+    translations[language]?.[key] || translations.hi[key] || key;
 
   const [cart, setCart] = useState({});
   const [name, setName] = useState('');
@@ -335,7 +371,6 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(false);
   const [presenceClientId, setPresenceClientId] = useState('');
 
-  // Server heartbeat: app sends a heartbeat every 30 seconds.
   useEffect(() => {
     let active = true;
     let interval = null;
@@ -345,7 +380,9 @@ export default function App() {
       try {
         let id = await AsyncStorage.getItem(PRESENCE_CLIENT_KEY);
         if (!id) {
-          id = `rationsetu-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          id = `rationsetu-${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2)}`;
           await AsyncStorage.setItem(PRESENCE_CLIENT_KEY, id);
         }
         if (active) setPresenceClientId(id);
@@ -358,16 +395,12 @@ export default function App() {
 
     async function sendHeartbeat(id) {
       if (!active || !id || AppState.currentState !== 'active') return;
-
       try {
         const result = await apiRequest('/api/presence/heartbeat', {
           method: 'POST',
           body: JSON.stringify({client_id: id}),
         });
-
-        if (active) {
-          setIsOnline(result.success !== false);
-        }
+        if (active) setIsOnline(result.success !== false);
       } catch (error) {
         if (active) setIsOnline(false);
       }
@@ -394,7 +427,6 @@ export default function App() {
     };
   }, [presenceClientId]);
 
-  // Load saved local information, language preference and live products.
   useEffect(() => {
     let active = true;
 
@@ -406,13 +438,15 @@ export default function App() {
         }
 
         const saved = await AsyncStorage.getItem(KEY);
-
         if (saved && active) {
           const parsed = JSON.parse(saved);
           setData(previous => ({
             ...previous,
             ...parsed,
             products: previous.products,
+            orders: Array.isArray(parsed.orders)
+              ? parsed.orders.map(normalizeOrder)
+              : previous.orders,
           }));
         }
       } catch (error) {
@@ -421,7 +455,6 @@ export default function App() {
 
       try {
         const result = await apiRequest('/api/products');
-
         if (active && result.success && Array.isArray(result.products)) {
           setData(previous => ({
             ...previous,
@@ -430,28 +463,22 @@ export default function App() {
           setApiError('');
         }
       } catch (error) {
-        if (active) {
-          setApiError(error.message);
-          Alert.alert('सर्वर कनेक्शन', error.message);
-        }
+        if (active) setApiError(error.message);
       }
     }
 
     initialize();
-
     return () => {
       active = false;
     };
   }, []);
 
-  // Save local order history and shop information.
   useEffect(() => {
     AsyncStorage.setItem(KEY, JSON.stringify(data)).catch(error =>
       console.log('Storage save error:', error),
     );
   }, [data]);
 
-  // Save selected language separately so existing saved app data stays unchanged.
   useEffect(() => {
     AsyncStorage.setItem(LANGUAGE_KEY, language).catch(error =>
       console.log('Language save error:', error),
@@ -471,29 +498,31 @@ export default function App() {
     return sum + (product ? product.price * quantity : 0);
   }, 0);
 
-  const productLabel = product => {
-    if (language === 'en') {
-      return productTranslations[product.name] || product.name;
-    }
-    return product.name;
-  };
+  const productLabel = product =>
+    language === 'en'
+      ? productTranslations[product.name] || product.name
+      : product.name;
 
   const unitLabel = unit => {
     if (language === 'en') {
       if (unit === 'किलो' || unit === 'kg') return t('kilo');
-      if (unit === 'लीटर' || unit === 'litre' || unit === 'liter') return t('litre');
+      if (unit === 'लीटर' || unit === 'litre' || unit === 'liter') {
+        return t('litre');
+      }
     }
     return unit;
   };
 
   const statusLabel = status => {
-    if (language === 'en') {
-      if (status === 'Pending') return t('pending');
-      if (status === 'Accepted') return t('accepted');
-      if (status === 'Delivered') return t('deliveredStatus');
-      if (status === 'Cancelled') return t('cancelled');
-    }
-    return status;
+    const labels = {
+      Pending: 'pending',
+      Accepted: 'accepted',
+      Preparing: 'preparingStatus',
+      'Out for Delivery': 'outForDeliveryStatus',
+      Delivered: 'deliveredStatus',
+      Cancelled: 'cancelled',
+    };
+    return labels[status] ? t(labels[status]) : status;
   };
 
   const button = (label, onPress, primary = false, disabled = false) => (
@@ -529,7 +558,7 @@ export default function App() {
     />
   );
 
-    const header = (
+  const header = (
     <View style={styles.header}>
       <Text style={styles.brand}>🛒 RationSetu</Text>
       <Text style={styles.sub}>{t('tagline')}</Text>
@@ -550,10 +579,8 @@ export default function App() {
     });
   }
 
-  // Get the customer's current GPS coordinates for delivery-radius validation.
   async function getCustomerLocation() {
     const permission = await Location.requestForegroundPermissionsAsync();
-
     if (permission.status !== 'granted') {
       throw new Error(
         language === 'en'
@@ -572,7 +599,6 @@ export default function App() {
     };
   }
 
-  // Send COD order to Render backend.
   async function placeOrder() {
     if (loading) return;
 
@@ -580,23 +606,22 @@ export default function App() {
       Alert.alert(t('infoIncomplete'), t('fillName'));
       return;
     }
-
     if (!/^[0-9]{10}$/.test(phone.trim())) {
       Alert.alert(t('wrongMobile'), t('fillMobile'));
       return;
     }
-
     if (!address.trim()) {
       Alert.alert(t('addressIncomplete'), t('fillAddress'));
       return;
     }
 
     const selectedItems = Object.entries(cart)
-      .filter(([id, quantity]) =>
-        quantity > 0 && data.products.some(p => p.id === id),
+      .filter(
+        ([id, quantity]) =>
+          quantity > 0 && data.products.some(product => product.id === id),
       )
       .map(([id, quantity]) => {
-        const product = data.products.find(p => p.id === id);
+        const product = data.products.find(item => item.id === id);
         return {
           name: product.name,
           price: product.price,
@@ -616,10 +641,8 @@ export default function App() {
     );
 
     setLoading(true);
-
     try {
       const customerLocation = await getCustomerLocation();
-
       const result = await apiRequest('/api/orders', {
         method: 'POST',
         body: JSON.stringify({
@@ -633,28 +656,116 @@ export default function App() {
         }),
       });
 
-      if (!result.success) {
+      if (!result.success || !result.order) {
         throw new Error(result.message || t('orderNotSaved'));
       }
 
-      const savedOrder = normalizeOrder(result.order);
+      const savedOrder = normalizeOrder({
+        ...result.order,
+        customer_name: result.order.customer_name || name.trim(),
+        mobile: result.order.mobile || phone.trim(),
+        address: result.order.address || address.trim(),
+        items: result.order.items || selectedItems,
+        total_amount: result.order.total_amount ?? orderTotal,
+        customer_order_token:
+          result.customer_order_token || result.order.customer_order_token,
+      });
 
       setData(previous => ({
         ...previous,
-        orders: [savedOrder, ...previous.orders],
+        orders: [
+          savedOrder,
+          ...previous.orders.filter(order => order.id !== savedOrder.id),
+        ],
       }));
 
       setCart({});
       setScreen('success');
-
       Alert.alert(t('orderSuccessTitle'), t('orderServerSuccess'));
     } catch (error) {
       Alert.alert(t('orderFailed'), error.message);
     } finally {
       setLoading(false);
     }
-  } 
-  // Admin login through backend.
+  }
+
+  async function refreshCustomerOrder(order) {
+    if (!order.customerOrderToken) {
+      Alert.alert(
+        t('refreshStatus'),
+        language === 'en'
+          ? 'This older order has no refresh token saved on this phone.'
+          : 'इस पुराने ऑर्डर का स्टेटस टोकन इस फोन में सेव नहीं है।',
+      );
+      return;
+    }
+
+    try {
+      const result = await apiRequest(
+        `/api/orders/${encodeURIComponent(order.id)}/status`,
+        {},
+        order.customerOrderToken,
+      );
+
+      if (result.success && result.order) {
+        const updated = normalizeOrder({
+          ...result.order,
+          customer_order_token:
+            result.order.customer_order_token || order.customerOrderToken,
+        });
+        setData(previous => ({
+          ...previous,
+          orders: previous.orders.map(item =>
+            item.id === order.id ? {...item, ...updated} : item,
+          ),
+        }));
+      }
+    } catch (error) {
+      Alert.alert(t('ordersNotLoaded'), error.message);
+    }
+  }
+
+  function cancelCustomerOrder(order) {
+    if (
+      ['Delivered', 'Cancelled'].includes(order.status) ||
+      !order.customerOrderToken
+    ) {
+      Alert.alert(t('cannotCancel'));
+      return;
+    }
+
+    Alert.alert(t('cancelOrder'), t('cancelConfirm'), [
+      {text: language === 'en' ? 'No' : 'नहीं', style: 'cancel'},
+      {
+        text: language === 'en' ? 'Yes, cancel' : 'हाँ, कैंसिल करें',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const result = await apiRequest(
+              `/api/orders/${encodeURIComponent(order.id)}/cancel`,
+              {method: 'PATCH', body: JSON.stringify({})},
+              order.customerOrderToken,
+            );
+
+            if (result.success) {
+              setData(previous => ({
+                ...previous,
+                orders: previous.orders.map(item =>
+                  item.id === order.id
+                    ? {...item, status: result.order?.status || 'Cancelled'}
+                    : item,
+                ),
+              }));
+              Alert.alert(t('success'), t('orderCancelled'));
+            }
+          } catch (error) {
+            Alert.alert(t('updateFailed'), error.message);
+          }
+        },
+      },
+    ]);
+  }
+
   async function adminLogin() {
     if (!adminId.trim() || !adminPassword.trim()) {
       Alert.alert(t('infoIncomplete'), t('adminInfo'));
@@ -662,7 +773,6 @@ export default function App() {
     }
 
     setLoading(true);
-
     try {
       const result = await apiRequest('/api/admin/login', {
         method: 'POST',
@@ -680,7 +790,6 @@ export default function App() {
       setAdminPassword('');
       await loadAdminOrders(result.token);
       setScreen('admin');
-
       Alert.alert(t('success'), t('adminLoginSuccess'));
     } catch (error) {
       Alert.alert(t('adminError'), error.message);
@@ -689,28 +798,50 @@ export default function App() {
     }
   }
 
-  // Fetch all orders from backend.
   async function loadAdminOrders(token = adminToken) {
     if (!token) return;
 
     try {
       const result = await apiRequest('/api/admin/orders', {}, token);
-
       if (result.success && Array.isArray(result.orders)) {
-        setData(previous => ({
-          ...previous,
-          orders: result.orders.map(normalizeOrder),
-        }));
+        setData(previous => {
+          const localById = new Map(
+            previous.orders.map(order => [String(order.id), order]),
+          );
+
+          const remoteOrders = result.orders.map(rawOrder => {
+            const remote = normalizeOrder(rawOrder);
+            const local = localById.get(String(remote.id));
+            return {
+              ...local,
+              ...remote,
+              customerOrderToken:
+                remote.customerOrderToken ||
+                local?.customerOrderToken ||
+                '',
+            };
+          });
+
+          const remoteIds = new Set(
+            remoteOrders.map(order => String(order.id)),
+          );
+          const localOnlyOrders = previous.orders.filter(
+            order => !remoteIds.has(String(order.id)),
+          );
+
+          return {
+            ...previous,
+            orders: [...remoteOrders, ...localOnlyOrders],
+          };
+        });
       }
     } catch (error) {
       Alert.alert(t('ordersNotLoaded'), error.message);
     }
   }
 
-  // Update order status on server.
   async function updateOrderStatus(orderId, status) {
     if (loading) return;
-
     setLoading(true);
 
     try {
@@ -727,12 +858,11 @@ export default function App() {
         setData(previous => ({
           ...previous,
           orders: previous.orders.map(order =>
-            order.id === orderId
+            String(order.id) === String(orderId)
               ? {...order, status: result.order?.status || status}
               : order,
           ),
         }));
-
         Alert.alert(t('success'), t('orderUpdated'));
       }
     } catch (error) {
@@ -742,10 +872,11 @@ export default function App() {
     }
   }
 
-  // Choose a product photo from the phone gallery.
   async function chooseProductImage() {
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
       if (!permission.granted) {
         Alert.alert(
           t('productImage'),
@@ -776,7 +907,6 @@ export default function App() {
     if (photo) setNewImage(photo);
   }
 
-  // Upload selected image through the protected backend endpoint.
   async function uploadProductImage(photo) {
     if (!photo?.uri) throw new Error(t('uploadFailed'));
 
@@ -791,9 +921,7 @@ export default function App() {
       `${API_BASE_URL}/api/admin/products/upload-image`,
       {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
+        headers: {Authorization: `Bearer ${adminToken}`},
         body: form,
       },
     );
@@ -808,7 +936,6 @@ export default function App() {
     return imageUrl;
   }
 
-  // Add product through backend.
   async function addProduct() {
     if (!newName.trim() || !newPrice.trim() || !newStock.trim()) {
       Alert.alert(t('infoIncomplete'), t('productInfo'));
@@ -829,7 +956,6 @@ export default function App() {
     }
 
     setLoading(true);
-
     try {
       const imageUrl = newImage ? await uploadProductImage(newImage) : null;
       const result = await apiRequest(
@@ -852,17 +978,13 @@ export default function App() {
 
       setData(previous => ({
         ...previous,
-        products: [
-          ...previous.products,
-          normalizeProduct(result.product),
-        ],
+        products: [...previous.products, normalizeProduct(result.product)],
       }));
 
       setNewName('');
       setNewPrice('');
       setNewStock('');
       setNewImage(null);
-
       Alert.alert(t('success'), t('productAdded'));
     } catch (error) {
       Alert.alert(t('productAddFailed'), error.message);
@@ -871,10 +993,8 @@ export default function App() {
     }
   }
 
-  // Add or replace the photo for an existing product.
   async function replaceProductImage(product) {
     if (loading || uploadingPhotoId) return;
-
     const photo = await chooseProductImage();
     if (!photo) return;
 
@@ -897,12 +1017,9 @@ export default function App() {
       setData(previous => ({
         ...previous,
         products: previous.products.map(item =>
-          item.id === product.id
-            ? {...item, image_url: imageUrl}
-            : item,
+          item.id === product.id ? {...item, image_url: imageUrl} : item,
         ),
       }));
-
       Alert.alert(t('success'), t('photoUploaded'));
     } catch (error) {
       Alert.alert(t('uploadFailed'), error.message);
@@ -911,7 +1028,6 @@ export default function App() {
     }
   }
 
-  // Update the existing product price and stock.
   async function saveProductPriceStock(product) {
     if (loading) return;
 
@@ -925,14 +1041,12 @@ export default function App() {
       Alert.alert(t('wrongInfo'), t('changesFailed'));
       return;
     }
-
     if (!stockText || !Number.isInteger(stock) || stock < 0) {
       Alert.alert(t('wrongInfo'), t('changesFailed'));
       return;
     }
 
     setLoading(true);
-
     try {
       const result = await apiRequest(
         `/api/admin/products/${encodeURIComponent(product.id)}`,
@@ -950,9 +1064,7 @@ export default function App() {
       setData(previous => ({
         ...previous,
         products: previous.products.map(item =>
-          item.id === product.id
-            ? {...item, price, stock}
-            : item,
+          item.id === product.id ? {...item, price, stock} : item,
         ),
       }));
 
@@ -973,9 +1085,29 @@ export default function App() {
   function logoutAdmin() {
     setAdminToken('');
     setAdminId('');
+    setAdminPassword('');
     setScreen('home');
     Alert.alert(t('success'), t('logoutSuccess'));
   }
+
+  function openSupportEmail() {
+    const url = `mailto:${SUPPORT_EMAIL}`;
+    Linking.openURL(url).catch(() =>
+      Alert.alert(t('emailSupport'), t('emailOpenError')),
+    );
+  }
+
+  function openWhatsApp() {
+    Linking.openURL(`https://wa.me/${SUPPORT_PHONE.replace('+', '')}`).catch(
+      () => Alert.alert('Error', 'WhatsApp could not be opened'),
+    );
+  }
+
+  function callSupport() {
+    Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() =>
+      Alert.alert('Error', 'Calling could not be started'),
+    );
+  } 
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -985,6 +1117,9 @@ export default function App() {
         {button(t('home'), () => setScreen('home'))}
         {button(t('myOrders'), () => setScreen('myorders'))}
         {button(t('settings'), () => setScreen('settings'))}
+        {button(t('shopAdmin'), () =>
+          setScreen(adminToken ? 'admin' : 'adminLogin'),
+        )}
       </View>
 
       {loading && (
@@ -998,6 +1133,10 @@ export default function App() {
         <ScrollView style={styles.body}>
           <Text style={styles.title}>{t('orderTitle')}</Text>
           <Text style={styles.muted}>{t('serviceArea')}</Text>
+
+          {apiError ? (
+            <Text style={styles.errorText}>{apiError}</Text>
+          ) : null}
 
           {field(search, setSearch, t('search'))}
 
@@ -1044,7 +1183,6 @@ export default function App() {
           )}
 
           <Text style={styles.title}>{t('deliveryInfo')}</Text>
-
           {field(name, setName, t('customerName'))}
           {field(phone, setPhone, t('mobile'), 'phone-pad')}
           {field(address, setAddress, t('fullAddress'))}
@@ -1071,37 +1209,306 @@ export default function App() {
 
       {screen === 'myorders' && (
         <ScrollView style={styles.body}>
-          <Text style={styles.title}>{t('myOrders')}</Text>
+          <Text style={styles.title}>{t('orderHistory')}</Text>
+          <Text style={styles.muted}>
+            {language === 'en'
+              ? 'Orders saved on this phone are shown below.'
+              : 'इस फोन में सेव हुए आपके पुराने और नए ऑर्डर यहाँ दिखेंगे।'}
+          </Text>
 
-          {data.orders
-            .filter(order => order.phone === phone.trim())
-            .map(order => (
-              <View style={styles.card} key={order.id}>
-                <Text style={styles.item}>
-                  {order.id} · {statusLabel(order.status)}
-                </Text>
+          {data.orders.map(order => (
+            <View style={styles.card} key={order.id}>
+              <Text style={styles.item}>
+                Order #{order.id}
+              </Text>
 
-                <Text>
-                  {order.items.map(item =>
-                    `${item.name} × ${item.qty}`,
-                  ).join(', ')}
-                </Text>
+              <Text style={styles.statusText}>
+                {t('status')}: {statusLabel(order.status)}
+              </Text>
 
-                <Text>{money(order.total)} · {order.payment}</Text>
-                <Text style={styles.muted}>{order.createdAt}</Text>
+              <Text>
+                {t('customer')}: {order.customer || '-'}
+              </Text>
+              <Text>
+                {t('mobile')}: {order.phone || '-'}
+              </Text>
+              <Text>
+                {t('address')}: {order.address || '-'}
+              </Text>
+
+              <Text style={styles.editLabel}>{t('items')}:</Text>
+              <Text>
+                {order.items
+                  .map(item => `${item.name} × ${item.qty}`)
+                  .join(', ')}
+              </Text>
+
+              <Text style={styles.item}>
+                {t('total')}: {money(order.total)}
+              </Text>
+              <Text>{t('payment')}: {order.payment || 'COD'}</Text>
+              <Text style={styles.muted}>
+                {order.createdAt || ''}
+              </Text>
+
+              {Array.isArray(order.statusHistory) &&
+                order.statusHistory.length > 0 && (
+                  <View style={styles.historyBox}>
+                    <Text style={styles.editLabel}>
+                      {language === 'en'
+                        ? 'Order progress'
+                        : 'ऑर्डर की प्रगति'}
+                    </Text>
+                    {order.statusHistory.map((entry, index) => (
+                      <Text key={`${order.id}-history-${index}`}>
+                        • {statusLabel(entry.status || entry.new_status || '')}
+                        {entry.created_at || entry.createdAt
+                          ? ` — ${entry.created_at || entry.createdAt}`
+                          : ''}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+              <View style={styles.actionRow}>
+                {button(
+                  t('refreshStatus'),
+                  () => refreshCustomerOrder(order),
+                )}
+
+                {!['Delivered', 'Cancelled'].includes(order.status) &&
+                  button(
+                    t('cancelOrder'),
+                    () => cancelCustomerOrder(order),
+                  )}
               </View>
-            ))}
+            </View>
+          ))}
 
-          {!data.orders.some(order => order.phone === phone.trim()) && (
+          {data.orders.length === 0 && (
             <Text style={styles.muted}>{t('noOrderForPhone')}</Text>
           )}
+
+          {button(t('goHome'), () => setScreen('home'), true)}
+        </ScrollView>
+      )}
+
+      {screen === 'adminLogin' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>{t('adminLogin')}</Text>
+
+          {field(adminId, setAdminId, t('adminId'))}
+          {field(
+            adminPassword,
+            setAdminPassword,
+            t('adminPassword'),
+            'default',
+            true,
+          )}
+
+          {button(t('adminLogin'), adminLogin, true, loading)}
+          {button(t('goHome'), () => setScreen('home'))}
+        </ScrollView>
+      )}
+
+      {screen === 'admin' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>{t('adminPanel')}</Text>
+
+          <View style={styles.adminSummary}>
+            <Text style={styles.item}>
+              {t('orderCount')}: {data.orders.length}
+            </Text>
+          </View>
+
+          {button(
+            t('refreshOrders'),
+            () => loadAdminOrders(),
+            true,
+            loading,
+          )}
+
+          <Text style={styles.title}>{t('adminOrders')}</Text>
+
+          {data.orders.map(order => (
+            <View style={styles.card} key={`admin-${order.id}`}>
+              <Text style={styles.item}>Order #{order.id}</Text>
+              <Text>
+                {t('customer')}: {order.customer || '-'}
+              </Text>
+              <Text>
+                {t('mobile')}: {order.phone || '-'}
+              </Text>
+              <Text>
+                {t('address')}: {order.address || '-'}
+              </Text>
+              <Text style={styles.editLabel}>{t('items')}:</Text>
+              <Text>
+                {order.items
+                  .map(item => `${item.name} × ${item.qty}`)
+                  .join(', ')}
+              </Text>
+              <Text style={styles.item}>
+                {t('total')}: {money(order.total)}
+              </Text>
+              <Text>{t('payment')}: {order.payment || 'COD'}</Text>
+              <Text style={styles.statusText}>
+                {t('status')}: {statusLabel(order.status)}
+              </Text>
+              <Text style={styles.muted}>{order.createdAt || ''}</Text>
+
+              <View style={styles.actionRow}>
+                {button(
+                  t('accept'),
+                  () => updateOrderStatus(order.id, 'Accepted'),
+                  false,
+                  loading,
+                )}
+                {button(
+                  t('preparing'),
+                  () => updateOrderStatus(order.id, 'Preparing'),
+                  false,
+                  loading,
+                )}
+              </View>
+
+              <View style={styles.actionRow}>
+                {button(
+                  t('outForDelivery'),
+                  () => updateOrderStatus(order.id, 'Out for Delivery'),
+                  false,
+                  loading,
+                )}
+                {button(
+                  t('delivered'),
+                  () => updateOrderStatus(order.id, 'Delivered'),
+                  false,
+                  loading,
+                )}
+              </View>
+
+              {order.status !== 'Delivered' &&
+                order.status !== 'Cancelled' &&
+                button(
+                  t('cancel'),
+                  () => updateOrderStatus(order.id, 'Cancelled'),
+                  false,
+                  loading,
+                )}
+            </View>
+          ))}
+
+          {data.orders.length === 0 && (
+            <Text style={styles.muted}>{t('noOrders')}</Text>
+          )}
+
+          <Text style={styles.title}>{t('productManagement')}</Text>
+          <Text style={styles.editLabel}>{t('addProductTitle')}</Text>
+
+          {field(newName, setNewName, t('productName'))}
+          {field(newPrice, setNewPrice, t('price'), 'decimal-pad')}
+          {field(newStock, setNewStock, t('stock'), 'number-pad')}
+
+          {newImage?.uri ? (
+            <Image
+              source={{uri: newImage.uri}}
+              style={styles.imagePreview}
+              resizeMode="cover"
+            />
+          ) : null}
+
+          {button(t('choosePhoto'), selectNewProductImage)}
+          {button(t('addProduct'), addProduct, true, loading)}
+
+          <Text style={styles.title}>{t('editPriceStock')}</Text>
+
+          {data.products.map(product => {
+            const draft = editingProducts[product.id] || {};
+
+            return (
+              <View style={styles.card} key={`product-${product.id}`}>
+                <View style={styles.productAdminRow}>
+                  {product.image_url ? (
+                    <Image
+                      source={{uri: product.image_url}}
+                      style={styles.productImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.productImagePlaceholder}>
+                      <Text>📦</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.productAdminInfo}>
+                    <Text style={styles.item}>{product.name}</Text>
+                    <Text style={styles.muted}>
+                      {money(product.price)} · {product.stock} {t('available')}
+                    </Text>
+                  </View>
+                </View>
+
+                <TextInput
+                  value={String(draft.price ?? product.price)}
+                  onChangeText={value =>
+                    setEditingProducts(previous => ({
+                      ...previous,
+                      [product.id]: {
+                        ...previous[product.id],
+                        price: value,
+                      },
+                    }))
+                  }
+                  placeholder={t('price')}
+                  keyboardType="decimal-pad"
+                  style={styles.input}
+                />
+
+                <TextInput
+                  value={String(draft.stock ?? product.stock)}
+                  onChangeText={value =>
+                    setEditingProducts(previous => ({
+                      ...previous,
+                      [product.id]: {
+                        ...previous[product.id],
+                        stock: value,
+                      },
+                    }))
+                  }
+                  placeholder={t('stock')}
+                  keyboardType="number-pad"
+                  style={styles.input}
+                />
+
+                {button(
+                  t('saveChanges'),
+                  () => saveProductPriceStock(product),
+                  true,
+                  loading,
+                )}
+
+                {button(
+                  uploadingPhotoId === product.id
+                    ? t('wait')
+                    : t('replacePhoto'),
+                  () => replaceProductImage(product),
+                  false,
+                  Boolean(uploadingPhotoId) || loading,
+                )}
+              </View>
+            );
+          })}
+
+          {button(t('logout'), logoutAdmin)}
         </ScrollView>
       )}
 
       {screen === 'settings' && (
         <ScrollView style={styles.body}>
           <Text style={styles.title}>{t('settings')}</Text>
-          <Text style={styles.item}>{t('language')} / Language</Text>
+          <Text style={styles.item}>
+            {t('language')} / Language
+          </Text>
           <Text style={styles.muted}>{t('chooseLanguage')}</Text>
 
           <TouchableOpacity
@@ -1140,26 +1547,16 @@ export default function App() {
             </Text>
           </TouchableOpacity>
 
-          <View style={{marginTop: 20, padding: 16, backgroundColor: '#F5F5F5', borderRadius: 12}}>
-            <Text style={{fontSize: 18, fontWeight: 'bold', marginBottom: 12}}>
-              {language === 'hi' ? 'सहायता और संपर्क' : 'Help & Support'}
+          <View style={styles.supportBox}>
+            <Text style={styles.supportTitle}>{t('helpSupport')}</Text>
+
+            {button(t('contactWhatsApp'), openWhatsApp, true)}
+            {button(t('callSupport'), callSupport)}
+            {button(t('emailSupport'), openSupportEmail)}
+
+            <Text style={styles.supportDetail}>
+              {SUPPORT_EMAIL}
             </Text>
-
-            <TouchableOpacity
-              onPress={() => Linking.openURL('https://wa.me/919086305021').catch(() => Alert.alert('Error', 'WhatsApp could not be opened'))}
-              style={{backgroundColor: '#25D366', padding: 14, borderRadius: 8, marginBottom: 10}}>
-              <Text style={{color: '#FFFFFF', textAlign: 'center', fontWeight: 'bold'}}>
-                {language === 'hi' ? 'WhatsApp पर संपर्क करें' : 'Contact on WhatsApp'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => Linking.openURL('tel:+919086305021').catch(() => Alert.alert('Error', 'Calling could not be started'))}
-              style={{backgroundColor: '#2878D0', padding: 14, borderRadius: 8}}>
-              <Text style={{color: '#FFFFFF', textAlign: 'center', fontWeight: 'bold'}}>
-                {language === 'hi' ? 'फोन कॉल करें' : 'Call Support'}
-              </Text>
-            </TouchableOpacity>
           </View>
 
           {button(t('goHome'), () => setScreen('home'), true)}
@@ -1222,6 +1619,10 @@ const styles = StyleSheet.create({
   muted: {
     color: '#617487',
     marginBottom: 8,
+  },
+  errorText: {
+    color: '#b42318',
+    marginVertical: 6,
   },
   editLabel: {
     color: '#1769aa',
@@ -1290,6 +1691,15 @@ const styles = StyleSheet.create({
     marginRight: 10,
     backgroundColor: '#edf3f8',
   },
+  productImagePlaceholder: {
+    width: 76,
+    height: 76,
+    borderRadius: 8,
+    marginRight: 10,
+    backgroundColor: '#edf3f8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   imagePreview: {
     width: 120,
     height: 120,
@@ -1300,6 +1710,9 @@ const styles = StyleSheet.create({
   productAdminRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  productAdminInfo: {
+    flex: 1,
   },
   row: {
     flexDirection: 'row',
@@ -1365,6 +1778,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e3edf6',
   },
+  statusText: {
+    color: '#1769aa',
+    fontWeight: 'bold',
+    marginVertical: 5,
+  },
+  historyBox: {
+    backgroundColor: '#f3f7fc',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  adminSummary: {
+    backgroundColor: '#e8f5ed',
+    padding: 14,
+    borderRadius: 10,
+    marginVertical: 8,
+  },
   languageOption: {
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -1390,4 +1826,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
+  supportBox: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+  },
+  supportTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#12466f',
+    marginBottom: 10,
+  },
+  supportDetail: {
+    color: '#617487',
+    textAlign: 'center',
+    marginTop: 8,
+  },
 });
+
+
