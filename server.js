@@ -1,4 +1,3 @@
-
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -829,9 +828,43 @@ app.post("/api/admin/config", requireAdmin, async (req, res) => {
   }
 });
 
+// ================= APP PRESENCE / HEARTBEAT =================
+
+// Keep a short-lived record of clients that have recently contacted the server.
+const presenceClients = new Map();
+
+app.post("/api/presence/heartbeat", (req, res) => {
+  const clientId =
+    typeof req.body?.client_id === "string"
+      ? req.body.client_id.trim()
+      : "";
+
+  if (!clientId || clientId.length > 200) {
+    return res.status(400).json({
+      success: false,
+      online: false,
+      message: "Valid client_id is required"
+    });
+  }
+
+  const now = Date.now();
+  presenceClients.set(clientId, now);
+
+  // Remove stale client records to keep memory usage limited.
+  for (const [id, lastSeen] of presenceClients.entries()) {
+    if (now - lastSeen > 90 * 1000) {
+      presenceClients.delete(id);
+    }
+  }
+
+  return res.json({
+    success: true,
+    online: true
+  });
+});
+
 // ================= START SERVER =================
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
 });
-
