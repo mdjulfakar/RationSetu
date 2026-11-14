@@ -678,7 +678,7 @@ if (!reason) {
         .from("orders")
         .update({
           status: "Cancelled",
-         cancellation_reason: reason  ||
+         cancellation_reason: reason  
         })
         .eq("id", req.params.id)
         .neq("status", "Delivered")
