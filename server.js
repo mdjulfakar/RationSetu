@@ -1,4 +1,3 @@
-
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -554,11 +553,10 @@ app.post("/api/orders", async (req, res) => {
     const finalTotal =
       subtotal + deliveryCharge + weightSurcharge + platformFee;
 
-    } 
     const order = {
       customer_name: String(customer_name).trim(),
       mobile: String(req.body.mobile || "").trim(),
-      address: String(address).trim(),
+            address: String(address).trim(),
       pin_code: String(pin_code).trim(),
       items,
       total_amount: finalTotal,
@@ -579,15 +577,6 @@ app.post("/api/orders", async (req, res) => {
     if (error) {
       return res.status(500).json({
         success: false,
-        error: error.message
-      });
-    }
-
-    const customer_order_token = makeCustomerOrderToken(data.id);
-   }
-      customer_name: String(customer_name).trim(),
-
-
         error: error.message
       });
     }
@@ -632,8 +621,9 @@ app.post("/api/orders", async (req, res) => {
       message: error.message || "Order could not be placed."
     });
   }
-}); 
- // ================= CUSTOMER: VIEW ONE SAVED ORDER STATUS =================
+});
+
+// ================= CUSTOMER: VIEW ONE SAVED ORDER STATUS =================
 
 app.get(
   "/api/orders/:id/status",
@@ -685,7 +675,7 @@ app.get(
 );
 
 // ================= CUSTOMER: CANCEL OWN ORDER =================
-// Cancellation reason is optional. If provided, it is saved for admin.
+// A written cancellation reason is required and saved for admin.
 
 app.patch(
   "/api/orders/:id/cancel",
@@ -730,18 +720,20 @@ app.patch(
       const reason = String(req.body?.reason || "")
         .trim()
         .slice(0, 1000);
-if (!reason) {
-  return res.status(400).json({
-    success: false,
-    code: "CANCELLATION_REASON_REQUIRED",
-    message: "कृपया ऑर्डर कैंसिल करने का कारण लिखें।"
-  });
-        }
+
+      if (!reason) {
+        return res.status(400).json({
+          success: false,
+          code: "CANCELLATION_REASON_REQUIRED",
+          message: "कृपया ऑर्डर कैंसिल करने का कारण लिखें।"
+        });
+      }
+
       const { data: updated, error: updateError } = await supabase
         .from("orders")
         .update({
           status: "Cancelled",
-         cancellation_reason: reason  
+          cancellation_reason: reason
         })
         .eq("id", req.params.id)
         .neq("status", "Delivered")
@@ -1035,8 +1027,9 @@ app.post(
       });
     }
   }
-); 
- // ================= ADMIN: VIEW ALL PRODUCTS =================
+);
+
+// ================= ADMIN: VIEW ALL PRODUCTS =================
 
 app.get("/api/admin/products", requireAdmin, async (req, res) => {
   try {
@@ -1146,7 +1139,6 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
     if (
       "price" in updates &&
       (!Number.isFinite(Number(updates.price)) ||
-
         Number(updates.price) < 0)
     ) {
       return res.status(400).json({
@@ -1679,4 +1671,3 @@ app.post("/api/presence/heartbeat", (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
 });
-
