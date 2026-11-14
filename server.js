@@ -1,3 +1,4 @@
+
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -64,6 +65,50 @@ function makeCustomerLoginToken(phone) {
   return `${payload}.${signature}`;
 }
 
+// Verify the signed login token and return the phone number it belongs to.
+function verifyCustomerLoginToken(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 3) return null;
+
+  const [phone, expiresText, suppliedSignature] = parts;
+  if (!/^[6-9]\d{9}$/.test(phone)) return null;
+
+  const expires = Number(expiresText);
+  if (!Number.isSafeInteger(expires) || expires <= Date.now()) return null;
+
+  const secret = customerLoginSecret();
+  if (!secret) return null;
+
+  const payload = `${phone}.${expiresText}`;
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update("rationsetu-customer-login:" + payload)
+    .digest("hex");
+
+  return safeTokenEqual(suppliedSignature, expectedSignature)
+    ? phone
+    : null;
+}
+
+// ================= CUSTOMER PIN CODE AVAILABILITY =================
+
+// Configure comma-separated 6-digit serviceable PIN codes in
+// SERVICEABLE_PIN_CODES on the server hosting environment.
+function getServiceablePinCodes() {
+  return String(process.env.SERVICEABLE_PIN_CODES || "")
+    .split(",")
+    .map(pin => pin.trim())
+    .filter(pin => /^\d{6}$/.test(pin));
+}
+
+function isServiceablePinCode(pinCode) {
+  const pin = String(pinCode || "").trim();
+  const serviceablePins = getServiceablePinCodes();
+  return /^\d{6}$/.test(pin) &&
+    serviceablePins.length > 0 &&
+    serviceablePins.includes(pin);
+}
+
 // ================= CUSTOMER ORDER SECURITY =================
 
 function customerOrderSecret() {
@@ -104,38 +149,6 @@ function safeTokenEqual(a, b) {
     first.length === second.length &&
     crypto.timingSafeEqual(first, second)
   );
-}
-
-function verifyCustomerLoginToken(token) {
-  try {
-    const parts = String(token || "").split(".");
-    if (parts.length !== 3) return null;
-
-    const [phone, expiresText, signature] = parts;
-    const expires = Number(expiresText);
-
-    if (
-      !/^[6-9]\d{9}$/.test(phone) ||
-      !Number.isSafeInteger(expires) ||
-      expires <= Date.now()
-    ) {
-      return null;
-    }
-
-    const secret = customerLoginSecret();
-    if (!secret) return null;
-
-    const payload = `${phone}.${expiresText}`;
-    const expected = crypto
-      .createHmac("sha256", secret)
-      .update("rationsetu-customer-login:" + payload)
-      .digest("hex");
-
-    if (!safeTokenEqual(signature, expected)) return null;
-    return phone;
-  } catch (error) {
-    return null;
-  }
 }
 
 function requireCustomerOrderAccess(req, res, next) {
@@ -355,6 +368,33 @@ app.get("/", (req, res) => {
 
 app.get("/api/products", async (req, res) => {
   try {
+    const pinCode = String(req.query.pin_code || "").trim();
+
+    if (!/^\d{6}$/.test(pinCode)) {
+      return res.status(400).json({
+        success: false,
+        code: "PIN_CODE_REQUIRED",
+        message: "कृपया 6 अंकों का PIN Code भेजें।"
+      });
+    }
+
+    if (getServiceablePinCodes().length === 0) {
+      return res.status(503).json({
+        success: false,
+        code: "PIN_CODES_NOT_CONFIGURED",
+        message: "दुकान के serviceable PIN Codes server पर सेट नहीं हैं।"
+      });
+    }
+
+    if (!isServiceablePinCode(pinCode)) {
+      return res.status(403).json({
+        success: false,
+        code: "PIN_CODE_NOT_SERVICEABLE",
+        message: "इस PIN Code पर अभी डिलीवरी उपलब्ध नहीं है।",
+        pin_code: pinCode
+      });
+    }
+
     const { data, error } = await supabase
       .from("products")
       .select("*")
@@ -420,27 +460,34 @@ app.post("/api/orders", async (req, res) => {
       items,
       total_amount,
       customer_lat,
-      customer_lng
+      customer_lng,
+      customer_token
     } = req.body;
 
-    // Require a valid Fast2SMS-verified customer token before placing an order.
-    const mobile = String(req.body.mobile || "").replace(/\D/g, "");
-    const customerToken = String(req.body.customer_token || "").trim();
-    const verifiedPhone = verifyCustomerLoginToken(customerToken);
+    const verifiedPhone = verifyCustomerLoginToken(customer_token);
+    const submittedPhone = String(req.body.mobile || "").replace(/\D/g, "");
 
-    if (!/^[6-9]\d{9}$/.test(mobile)) {
-      return res.status(400).json({
-        success: false,
-        code: "CUSTOMER_MOBILE_REQUIRED",
-        message: "Please enter a valid 10-digit mobile number."
-      });
-    }
-
-    if (!verifiedPhone || verifiedPhone !== mobile) {
+    if (!verifiedPhone) {
       return res.status(401).json({
         success: false,
         code: "CUSTOMER_OTP_REQUIRED",
-        message: "Please verify your mobile number with OTP before placing an order."
+        message: "ऑर्डर करने से पहले मोबाइल OTP सत्यापित करें।"
+      });
+    }
+
+    if (!submittedPhone || submittedPhone !== verifiedPhone) {
+      return res.status(403).json({
+        success: false,
+        code: "CUSTOMER_PHONE_MISMATCH",
+        message: "सत्यापित मोबाइल नंबर और ऑर्डर का मोबाइल नंबर मेल नहीं खाते।"
+      });
+    }
+
+    if (!isServiceablePinCode(pin_code)) {
+      return res.status(403).json({
+        success: false,
+        code: "PIN_CODE_NOT_SERVICEABLE",
+        message: "इस PIN Code पर अभी डिलीवरी उपलब्ध नहीं है।"
       });
     }
 
@@ -555,8 +602,8 @@ app.post("/api/orders", async (req, res) => {
 
     const order = {
       customer_name: String(customer_name).trim(),
-      mobile: String(req.body.mobile || "").trim(),
-            address: String(address).trim(),
+      mobile: verifiedPhone,
+      address: String(address).trim(),
       pin_code: String(pin_code).trim(),
       items,
       total_amount: finalTotal,
@@ -621,9 +668,8 @@ app.post("/api/orders", async (req, res) => {
       message: error.message || "Order could not be placed."
     });
   }
-});
-
-// ================= CUSTOMER: VIEW ONE SAVED ORDER STATUS =================
+}); 
+ // ================= CUSTOMER: VIEW ONE SAVED ORDER STATUS =================
 
 app.get(
   "/api/orders/:id/status",
@@ -675,7 +721,7 @@ app.get(
 );
 
 // ================= CUSTOMER: CANCEL OWN ORDER =================
-// A written cancellation reason is required and saved for admin.
+// Cancellation reason is optional. If provided, it is saved for admin.
 
 app.patch(
   "/api/orders/:id/cancel",
@@ -720,20 +766,18 @@ app.patch(
       const reason = String(req.body?.reason || "")
         .trim()
         .slice(0, 1000);
-
-      if (!reason) {
-        return res.status(400).json({
-          success: false,
-          code: "CANCELLATION_REASON_REQUIRED",
-          message: "कृपया ऑर्डर कैंसिल करने का कारण लिखें।"
-        });
-      }
-
+if (!reason) {
+  return res.status(400).json({
+    success: false,
+    code: "CANCELLATION_REASON_REQUIRED",
+    message: "कृपया ऑर्डर कैंसिल करने का कारण लिखें।"
+  });
+        }
       const { data: updated, error: updateError } = await supabase
         .from("orders")
         .update({
           status: "Cancelled",
-          cancellation_reason: reason
+         cancellation_reason: reason  
         })
         .eq("id", req.params.id)
         .neq("status", "Delivered")
@@ -1027,9 +1071,8 @@ app.post(
       });
     }
   }
-);
-
-// ================= ADMIN: VIEW ALL PRODUCTS =================
+); 
+ // ================= ADMIN: VIEW ALL PRODUCTS =================
 
 app.get("/api/admin/products", requireAdmin, async (req, res) => {
   try {
@@ -1101,6 +1144,7 @@ app.post("/api/admin/products", requireAdmin, async (req, res) => {
       product: data
     });
   } catch (error) {
+
     res.status(500).json({
       success: false,
       message: error.message
@@ -1671,3 +1715,4 @@ app.post("/api/presence/heartbeat", (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
 });
+
