@@ -107,6 +107,38 @@ function safeTokenEqual(a, b) {
   );
 }
 
+function verifyCustomerLoginToken(token) {
+  try {
+    const parts = String(token || "").split(".");
+    if (parts.length !== 3) return null;
+
+    const [phone, expiresText, signature] = parts;
+    const expires = Number(expiresText);
+
+    if (
+      !/^[6-9]\d{9}$/.test(phone) ||
+      !Number.isSafeInteger(expires) ||
+      expires <= Date.now()
+    ) {
+      return null;
+    }
+
+    const secret = customerLoginSecret();
+    if (!secret) return null;
+
+    const payload = `${phone}.${expiresText}`;
+    const expected = crypto
+      .createHmac("sha256", secret)
+      .update("rationsetu-customer-login:" + payload)
+      .digest("hex");
+
+    if (!safeTokenEqual(signature, expected)) return null;
+    return phone;
+  } catch (error) {
+    return null;
+  }
+}
+
 function requireCustomerOrderAccess(req, res, next) {
   try {
     const orderId = String(req.params.id || "").trim();
@@ -392,6 +424,27 @@ app.post("/api/orders", async (req, res) => {
       customer_lng
     } = req.body;
 
+    // Require a valid Fast2SMS-verified customer token before placing an order.
+    const mobile = String(req.body.mobile || "").replace(/\D/g, "");
+    const customerToken = String(req.body.customer_token || "").trim();
+    const verifiedPhone = verifyCustomerLoginToken(customerToken);
+
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      return res.status(400).json({
+        success: false,
+        code: "CUSTOMER_MOBILE_REQUIRED",
+        message: "Please enter a valid 10-digit mobile number."
+      });
+    }
+
+    if (!verifiedPhone || verifiedPhone !== mobile) {
+      return res.status(401).json({
+        success: false,
+        code: "CUSTOMER_OTP_REQUIRED",
+        message: "Please verify your mobile number with OTP before placing an order."
+      });
+    }
+
     if (
       !String(customer_name || "").trim() ||
       !String(address || "").trim() ||
@@ -503,28 +556,8 @@ app.post("/api/orders", async (req, res) => {
 
     const order = {
       customer_name: String(customer_name).trim(),
-      mobile: String(req.body.mobile || "").trim(),
-      address: String(address).trim(),
-      pin_code: String(pin_code).trim(),
-      items,
-      total_amount: finalTotal,
-      item_subtotal: subtotal,
-      customer_lat: Number(customer_lat),
-      customer_lng: Number(customer_lng),
-      delivery_distance_km: Number(distanceKm.toFixed(2)),
-      payment_method: "COD",
-      status: "Pending"
-    };
 
-    const { data, error } = await supabase
-      .from("orders")
-      .insert(order)
-      .select()
-      .single();
 
-    if (error) {
-      return res.status(500).json({
-        success: false,
         error: error.message
       });
     }
@@ -1083,6 +1116,7 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
     if (
       "price" in updates &&
       (!Number.isFinite(Number(updates.price)) ||
+
         Number(updates.price) < 0)
     ) {
       return res.status(400).json({
@@ -1615,6 +1649,4 @@ app.post("/api/presence/heartbeat", (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
 });
-
-
 
