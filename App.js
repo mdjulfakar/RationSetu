@@ -1,4 +1,3 @@
-
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
@@ -134,6 +133,11 @@ const translations = {
     changesFailed: 'कीमत और स्टॉक अपडेट नहीं हुए।',
     refreshStatus: 'स्टेटस देखें',
     cancelOrder: 'ऑर्डर कैंसिल करें',
+    cancelReasonTitle: 'कैंसिल करने का कारण लिखें',
+    cancelReasonPlaceholder: 'ऑर्डर कैंसिल करने का कारण लिखें...',
+    reasonRequired: 'कृपया कैंसिल करने का कारण लिखें।',
+    submitCancellation: 'कारण भेजें और कैंसिल करें',
+    cancellationReason: 'कैंसिल करने का कारण',
     cancelConfirm: 'क्या आप यह ऑर्डर कैंसिल करना चाहते हैं?',
     orderCancelled: 'ऑर्डर कैंसिल हो गया।',
     cannotCancel: 'यह ऑर्डर अब कैंसिल नहीं किया जा सकता।',
@@ -247,6 +251,11 @@ const translations = {
     changesFailed: 'Price and stock could not be updated.',
     refreshStatus: 'Refresh Status',
     cancelOrder: 'Cancel Order',
+    cancelReasonTitle: 'Enter cancellation reason',
+    cancelReasonPlaceholder: 'Write why you want to cancel this order...',
+    reasonRequired: 'Please enter a cancellation reason.',
+    submitCancellation: 'Submit reason and cancel',
+    cancellationReason: 'Cancellation reason',
     cancelConfirm: 'Do you want to cancel this order?',
     orderCancelled: 'Order cancelled.',
     cannotCancel: 'This order can no longer be cancelled.',
@@ -320,6 +329,7 @@ function normalizeOrder(order) {
     address: order.address || '',
     total: Number(order.total_amount ?? order.total ?? 0),
     status: order.status || 'Pending',
+    cancellationReason: order.cancellation_reason || order.cancellationReason || order.cancel_reason || '',
     payment: order.payment_method || order.payment || 'COD',
     items: Array.isArray(order.items) ? order.items : [],
     createdAt: order.created_at || order.createdAt || '',
@@ -354,6 +364,8 @@ export default function App() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [search, setSearch] = useState('');
+  const [cancellationOrder, setCancellationOrder] = useState(null);
+  const [cancellationReason, setCancellationReason] = useState('');
 
   const [newName, setNewName] = useState('');
   const [newPrice, setNewPrice] = useState('');
@@ -727,44 +739,54 @@ export default function App() {
   }
 
   function cancelCustomerOrder(order) {
-    if (
-      ['Delivered', 'Cancelled'].includes(order.status) ||
-      !order.customerOrderToken
-    ) {
+    if (['Delivered', 'Cancelled'].includes(order.status) || !order.customerOrderToken) {
       Alert.alert(t('cannotCancel'));
       return;
     }
+    setCancellationOrder(order);
+    setCancellationReason('');
+  }
 
-    Alert.alert(t('cancelOrder'), t('cancelConfirm'), [
-      {text: language === 'en' ? 'No' : 'नहीं', style: 'cancel'},
-      {
-        text: language === 'en' ? 'Yes, cancel' : 'हाँ, कैंसिल करें',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const result = await apiRequest(
-              `/api/orders/${encodeURIComponent(order.id)}/cancel`,
-              {method: 'PATCH', body: JSON.stringify({})},
-              order.customerOrderToken,
-            );
-
-            if (result.success) {
-              setData(previous => ({
-                ...previous,
-                orders: previous.orders.map(item =>
-                  item.id === order.id
-                    ? {...item, status: result.order?.status || 'Cancelled'}
-                    : item,
-                ),
-              }));
-              Alert.alert(t('success'), t('orderCancelled'));
-            }
-          } catch (error) {
-            Alert.alert(t('updateFailed'), error.message);
-          }
-        },
-      },
-    ]);
+  async function submitCancellation() {
+    const reason = cancellationReason.trim();
+    if (!reason) {
+      Alert.alert(t('reasonRequired'));
+      return;
+    }
+    if (!cancellationOrder?.customerOrderToken) {
+      Alert.alert(t('cannotCancel'));
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await apiRequest(
+        `/api/orders/${encodeURIComponent(cancellationOrder.id)}/cancel`,
+        {method: 'PATCH', body: JSON.stringify({reason})},
+        cancellationOrder.customerOrderToken,
+      );
+      if (result.success) {
+        const updatedOrder = normalizeOrder({
+          ...(result.order || cancellationOrder),
+          status: result.order?.status || 'Cancelled',
+          cancellation_reason: result.order?.cancellation_reason || result.order?.cancellationReason || reason,
+        });
+        setData(previous => ({
+          ...previous,
+          orders: previous.orders.map(item =>
+            item.id === cancellationOrder.id ? {...item, ...updatedOrder} : item,
+          ),
+        }));
+        setCancellationOrder(null);
+        setCancellationReason('');
+        Alert.alert(t('success'), t('orderCancelled'));
+      } else {
+        Alert.alert(t('cannotCancel'));
+      }
+    } catch (error) {
+      Alert.alert(t('updateFailed'), error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function adminLogin() {
@@ -1118,7 +1140,7 @@ export default function App() {
         {button(t('home'), () => setScreen('home'))}
         {button(t('myOrders'), () => setScreen('myorders'))}
         {button(t('settings'), () => setScreen('settings'))}
-        
+
       </View>
 
       {loading && (
@@ -1127,6 +1149,28 @@ export default function App() {
           <Text style={styles.muted}>{t('wait')}</Text>
         </View>
       )}
+
+      {cancellationOrder ? (
+        <View style={styles.cancelOverlay}>
+          <View style={styles.cancelDialog}>
+            <Text style={styles.title}>{t('cancelReasonTitle')}</Text>
+            <TextInput
+              value={cancellationReason}
+              onChangeText={setCancellationReason}
+              placeholder={t('cancelReasonPlaceholder')}
+              multiline
+              textAlignVertical="top"
+              style={styles.cancelReasonInput}
+              placeholderTextColor="#8193a5"
+            />
+            {button(t('submitCancellation'), submitCancellation, true, loading)}
+            {button(language === 'en' ? 'Back' : 'वापस', () => {
+              setCancellationOrder(null);
+              setCancellationReason('');
+            }, false, loading)}
+          </View>
+        </View>
+      ) : null}
 
       {screen === 'home' && (
         <ScrollView style={styles.body}>
@@ -1224,8 +1268,9 @@ export default function App() {
               <Text style={styles.statusText}>
                 {t('status')}: {statusLabel(order.status)}
               </Text>
-
-              <Text>
+              {order.cancellationReason ? (
+                <Text>{t('cancellationReason')}: {order.cancellationReason}</Text>
+              ) : null}               <Text>
                 {t('customer')}: {order.customer || '-'}
               </Text>
               <Text>
@@ -1354,6 +1399,9 @@ export default function App() {
               <Text style={styles.statusText}>
                 {t('status')}: {statusLabel(order.status)}
               </Text>
+              {order.cancellationReason ? (
+                <Text>{t('cancellationReason')}: {order.cancellationReason}</Text>
+              ) : null}
               <Text style={styles.muted}>{order.createdAt || ''}</Text>
 
               <View style={styles.actionRow}>
@@ -1782,6 +1830,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginVertical: 5,
   },
+  cancelOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center',
+    padding: 20, zIndex: 20, elevation: 20,
+  },
+  cancelDialog: {backgroundColor: '#fff', borderRadius: 12, padding: 16},
+  cancelReasonInput: {
+    minHeight: 110, borderWidth: 1, borderColor: '#cbd8e5',
+    borderRadius: 8, padding: 10, marginVertical: 12,
+    color: '#20384f', backgroundColor: '#fff',
+  },
   historyBox: {
     backgroundColor: '#f3f7fc',
     borderRadius: 8,
@@ -1843,5 +1902,3 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
-
-
