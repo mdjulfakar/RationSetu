@@ -555,6 +555,14 @@ app.post("/api/orders", async (req, res) => {
       subtotal + deliveryCharge + weightSurcharge + platformFee;
 
     const order = {
+  customer_name: String(customer_name).trim(),
+
+
+    error: error.message
+  });
+}
+
+const customer_order_token = makeCustomerOrderToken(data.id);
       customer_name: String(customer_name).trim(),
 
 
