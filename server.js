@@ -554,15 +554,37 @@ app.post("/api/orders", async (req, res) => {
     const finalTotal =
       subtotal + deliveryCharge + weightSurcharge + platformFee;
 
+    } 
     const order = {
-  customer_name: String(customer_name).trim(),
+      customer_name: String(customer_name).trim(),
+      mobile: String(req.body.mobile || "").trim(),
+      address: String(address).trim(),
+      pin_code: String(pin_code).trim(),
+      items,
+      total_amount: finalTotal,
+      item_subtotal: subtotal,
+      customer_lat: Number(customer_lat),
+      customer_lng: Number(customer_lng),
+      delivery_distance_km: Number(distanceKm.toFixed(2)),
+      payment_method: "COD",
+      status: "Pending"
+    };
 
+    const { data, error } = await supabase
+      .from("orders")
+      .insert(order)
+      .select()
+      .single();
 
-    error: error.message
-  });
-}
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
 
-const customer_order_token = makeCustomerOrderToken(data.id);
+    const customer_order_token = makeCustomerOrderToken(data.id);
+   }
       customer_name: String(customer_name).trim(),
 
 
