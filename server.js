@@ -667,12 +667,18 @@ app.patch(
       const reason = String(req.body?.reason || "")
         .trim()
         .slice(0, 1000);
-
+if (!reason) {
+  return res.status(400).json({
+    success: false,
+    code: "CANCELLATION_REASON_REQUIRED",
+    message: "कृपया ऑर्डर कैंसिल करने का कारण लिखें।"
+  });
+        }
       const { data: updated, error: updateError } = await supabase
         .from("orders")
         .update({
           status: "Cancelled",
-          cancellation_reason: reason || null
+         cancellation_reason: reason  ||
         })
         .eq("id", req.params.id)
         .neq("status", "Delivered")
