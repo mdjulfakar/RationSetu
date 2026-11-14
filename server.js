@@ -41,11 +41,31 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// ================= CUSTOMER LOGIN SECURITY =================
+
+function customerLoginSecret() {
+  return (
+    process.env.CUSTOMER_ORDER_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    ""
+  );
+}
+
+function makeCustomerLoginToken(phone) {
+  const secret = customerLoginSecret();
+  if (!secret) throw new Error("Customer login secret is not configured");
+
+  const expires = Date.now() + 30 * 24 * 60 * 60 * 1000;
+  const payload = `${phone}.${expires}`;
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update("rationsetu-customer-login:" + payload)
+    .digest("hex");
+
+  return `${payload}.${signature}`;
+}
+
 // ================= CUSTOMER ORDER SECURITY =================
-// Customer does not search by mobile, enter OTP, or enter a PIN.
-// The app silently stores the returned token with that order on this phone.
-// The token is deterministic HMAC signed with a private server secret, so
-// no extra database table or paid service is required.
 
 function customerOrderSecret() {
   return (
@@ -118,6 +138,125 @@ function requireCustomerOrderAccess(req, res, next) {
     });
   }
 }
+
+// ================= CUSTOMER: FAST2SMS OTP LOGIN =================
+
+// Send OTP. API key and OTP Template ID must be set in server environment.
+app.post("/api/customer/otp/send", async (req, res) => {
+  try {
+    const phone = String(req.body?.phone || "").replace(/\D/g, "");
+
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: "कृपया सही 10 अंकों का मोबाइल नंबर डालें।"
+      });
+    }
+
+    const apiKey = process.env.FAST2SMS_API_KEY;
+    const otpId = process.env.FAST2SMS_OTP_ID;
+
+    if (!apiKey || !otpId) {
+      return res.status(503).json({
+        success: false,
+        message: "Fast2SMS API Key या OTP Template ID server में सेट नहीं है।"
+      });
+    }
+
+    const response = await fetch("https://www.fast2sms.com/dev/otp/send", {
+      method: "POST",
+      headers: {
+        "Authorization": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        mobile: phone,
+        otp_id: otpId,
+        otp_length: 6,
+        otp_expiry: 5
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.return !== true) {
+      console.error("Fast2SMS send OTP error:", result);
+      return res.status(502).json({
+        success: false,
+        message: result.message || "OTP भेजा नहीं जा सका।"
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "OTP भेज दिया गया है।"
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "OTP भेजने में समस्या हुई।"
+    });
+  }
+});
+
+// Verify OTP with Fast2SMS and return a signed customer login token.
+app.post("/api/customer/otp/verify", async (req, res) => {
+  try {
+    const phone = String(req.body?.phone || "").replace(/\D/g, "");
+    const otp = String(req.body?.otp || "").trim();
+
+    if (!/^[6-9]\d{9}$/.test(phone) || !/^\d{4,10}$/.test(otp)) {
+      return res.status(400).json({
+        success: false,
+        message: "मोबाइल नंबर या OTP सही नहीं है।"
+      });
+    }
+
+    const apiKey = process.env.FAST2SMS_API_KEY;
+
+    if (!apiKey) {
+      return res.status(503).json({
+        success: false,
+        message: "Fast2SMS API Key server में सेट नहीं है।"
+      });
+    }
+
+    const response = await fetch("https://www.fast2sms.com/dev/otp/verify", {
+      method: "POST",
+      headers: {
+        "Authorization": apiKey,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        mobile: phone,
+        otp
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.return !== true) {
+      return res.status(401).json({
+        success: false,
+        message: result.message || "OTP गलत या समाप्त हो गया है।"
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "मोबाइल नंबर सत्यापित हो गया।",
+      phone,
+      customer_token: makeCustomerLoginToken(phone)
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "OTP सत्यापन में समस्या हुई।"
+    });
+  }
+});
 
 // ================= SHOP SETTINGS =================
 
@@ -210,6 +349,35 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
+// ================= CUSTOMER: ACTIVE OFFERS =================
+
+app.get("/api/offers", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("rationsetu_offers")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    return res.json({
+      success: true,
+      offers: data || []
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
 // ================= CUSTOMER: PLACE COD ORDER =================
 
 app.post("/api/orders", async (req, res) => {
@@ -217,6 +385,7 @@ app.post("/api/orders", async (req, res) => {
     const {
       customer_name,
       address,
+      pin_code,
       items,
       total_amount,
       customer_lat,
@@ -226,6 +395,7 @@ app.post("/api/orders", async (req, res) => {
     if (
       !String(customer_name || "").trim() ||
       !String(address || "").trim() ||
+      !/^\d{6}$/.test(String(pin_code || "").trim()) ||
       !Array.isArray(items) ||
       items.length === 0 ||
       !Number.isFinite(Number(total_amount)) ||
@@ -233,7 +403,7 @@ app.post("/api/orders", async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Please provide customer name, full address and order items."
+        message: "Please provide customer name, full address, valid 6-digit PIN Code and order items."
       });
     }
 
@@ -333,10 +503,9 @@ app.post("/api/orders", async (req, res) => {
 
     const order = {
       customer_name: String(customer_name).trim(),
-      // Keep the existing database column compatible, but do not require,
-      // display, search by, or use a customer's mobile number for access.
       mobile: String(req.body.mobile || "").trim(),
       address: String(address).trim(),
+      pin_code: String(pin_code).trim(),
       items,
       total_amount: finalTotal,
       item_subtotal: subtotal,
@@ -360,8 +529,6 @@ app.post("/api/orders", async (req, res) => {
       });
     }
 
-    // Token is returned once to the app and saved invisibly with this order.
-    // The customer never types it and never searches for the order.
     const customer_order_token = makeCustomerOrderToken(data.id);
 
     const { error: historyError } = await supabase
@@ -402,8 +569,8 @@ app.post("/api/orders", async (req, res) => {
       message: error.message || "Order could not be placed."
     });
   }
-}); // ================= CUSTOMER: VIEW ONE SAVED ORDER STATUS =================
-// Called silently from the matching card in My Orders. No order search screen.
+}); 
+ // ================= CUSTOMER: VIEW ONE SAVED ORDER STATUS =================
 
 app.get(
   "/api/orders/:id/status",
@@ -455,8 +622,7 @@ app.get(
 );
 
 // ================= CUSTOMER: CANCEL OWN ORDER =================
-// Customer can cancel before delivery. Authorization uses the hidden token
-// saved with that order on the same phone, not the mobile number.
+// Cancellation reason is optional. If provided, it is saved for admin.
 
 app.patch(
   "/api/orders/:id/cancel",
@@ -498,9 +664,16 @@ app.patch(
         });
       }
 
+      const reason = String(req.body?.reason || "")
+        .trim()
+        .slice(0, 1000);
+
       const { data: updated, error: updateError } = await supabase
         .from("orders")
-        .update({ status: "Cancelled" })
+        .update({
+          status: "Cancelled",
+          cancellation_reason: reason || null
+        })
         .eq("id", req.params.id)
         .neq("status", "Delivered")
         .select()
@@ -520,17 +693,24 @@ app.patch(
         });
       }
 
+      const historyNote = reason
+        ? "Order cancelled by customer: " + reason
+        : "Order cancelled by customer";
+
       const { error: historyError } = await supabase
         .from("order_status_history")
         .insert({
           order_id: updated.id,
           status: "Cancelled",
-          note: "Order cancelled by customer",
+          note: historyNote,
           changed_by: "customer"
         });
 
       if (historyError) {
-        console.error("Customer cancellation history save failed:", historyError.message);
+        console.error(
+          "Customer cancellation history save failed:",
+          historyError.message
+        );
       }
 
       return res.json({
@@ -548,6 +728,7 @@ app.patch(
 );
 
 // ================= ADMIN: LOGIN =================
+// Existing Admin ID/password login remains unchanged.
 
 app.post("/api/admin/login", (req, res) => {
   const { admin_id, password } = req.body;
@@ -785,7 +966,8 @@ app.post(
       });
     }
   }
-); // ================= ADMIN: VIEW ALL PRODUCTS =================
+); 
+ // ================= ADMIN: VIEW ALL PRODUCTS =================
 
 app.get("/api/admin/products", requireAdmin, async (req, res) => {
   try {
@@ -939,6 +1121,333 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
     });
   }
 });
+
+// ================= ADMIN: VIEW ALL OFFERS =================
+
+app.get("/api/admin/offers", requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("rationsetu_offers")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    return res.json({
+      success: true,
+      offers: data || []
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ================= ADMIN: CREATE OFFER =================
+
+app.post("/api/admin/offers", requireAdmin, async (req, res) => {
+  try {
+    const title = String(req.body?.title || "").trim();
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        message: "Offer title is required"
+      });
+    }
+
+    const offer = {
+      title: title.slice(0, 200),
+      description: String(req.body?.description || "").trim(),
+      image_url: String(req.body?.image_url || "").trim(),
+      is_active:
+        req.body?.is_active === undefined
+          ? true
+          : Boolean(req.body.is_active),
+      updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from("rationsetu_offers")
+      .insert(offer)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      offer: data
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ================= ADMIN: EDIT / ACTIVATE / DEACTIVATE OFFER =================
+
+app.patch("/api/admin/offers/:id", requireAdmin, async (req, res) => {
+  try {
+    const allowedFields = [
+      "title",
+      "description",
+      "image_url",
+      "is_active"
+    ];
+
+    const updates = {};
+
+    for (const key of allowedFields) {
+      if (req.body[key] !== undefined) {
+        updates[key] = req.body[key];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid offer updates provided"
+      });
+    }
+
+    if ("title" in updates) {
+      updates.title = String(updates.title).trim();
+
+      if (!updates.title) {
+        return res.status(400).json({
+          success: false,
+          message: "Offer title cannot be empty"
+        });
+      }
+
+      updates.title = updates.title.slice(0, 200);
+    }
+
+    if ("description" in updates) {
+      updates.description = String(updates.description || "").trim();
+    }
+
+    if ("image_url" in updates) {
+      updates.image_url = String(updates.image_url || "").trim();
+    }
+
+    if ("is_active" in updates) {
+      if (typeof updates.is_active !== "boolean") {
+        return res.status(400).json({
+          success: false,
+          message: "is_active must be true or false"
+        });
+      }
+    }
+
+    updates.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from("rationsetu_offers")
+      .update(updates)
+      .eq("id", req.params.id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "Offer not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      offer: data
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ================= ADMIN: DELETE OFFER =================
+
+app.delete("/api/admin/offers/:id", requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("rationsetu_offers")
+      .delete()
+      .eq("id", req.params.id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: "Offer not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Offer deleted successfully"
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
+
+// ================= ADMIN: UPLOAD OFFER IMAGE =================
+
+app.post(
+  "/api/admin/offers/upload-image",
+  requireAdmin,
+  express.raw({
+    type: "multipart/form-data",
+    limit: "6mb"
+  }),
+  async (req, res) => {
+    try {
+      const contentType = req.headers["content-type"] || "";
+      const match = contentType.match(
+        /boundary=(?:"([^"]+)"|([^;]+))/i
+      );
+      const boundaryValue = match && (match[1] || match[2]);
+
+      if (!boundaryValue || !Buffer.isBuffer(req.body)) {
+        return res.status(400).json({
+          success: false,
+          message: "Offer image file is required"
+        });
+      }
+
+      const body = req.body;
+      const boundary = Buffer.from("--" + boundaryValue.trim());
+      const separator = Buffer.from("\r\n\r\n");
+      const nextBoundary = Buffer.from(
+        "\r\n--" + boundaryValue.trim()
+      );
+
+      let fileBuffer = null;
+      let mimeType = "";
+      let position = body.indexOf(boundary);
+
+      while (position !== -1) {
+        const headersStart = position + boundary.length + 2;
+        const headersEnd = body.indexOf(separator, headersStart);
+
+        if (headersEnd === -1) break;
+
+        const headers = body
+          .subarray(headersStart, headersEnd)
+          .toString("utf8");
+
+        const dataStart = headersEnd + separator.length;
+        const dataEnd = body.indexOf(nextBoundary, dataStart);
+
+        if (dataEnd === -1) break;
+
+        if (/content-disposition:[^\r\n]*name="file"/i.test(headers)) {
+          const typeMatch = headers.match(
+            /content-type:\s*([^\r\n]+)/i
+          );
+
+          mimeType = typeMatch
+            ? typeMatch[1].trim().toLowerCase()
+            : "";
+
+          fileBuffer = body.subarray(dataStart, dataEnd);
+          break;
+        }
+
+        position = body.indexOf(boundary, dataEnd + 2);
+      }
+
+      const allowedTypes = {
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp"
+      };
+
+      if (
+        !fileBuffer ||
+        fileBuffer.length === 0 ||
+        !allowedTypes[mimeType]
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Please upload JPG, PNG or WEBP image"
+        });
+      }
+
+      const bucket =
+        process.env.SUPABASE_PRODUCT_IMAGES_BUCKET ||
+        "product-images";
+
+      const filePath =
+        `offers/${Date.now()}-${crypto.randomBytes(8).toString("hex")}.${allowedTypes[mimeType]}`;
+
+      const { error } = await supabase.storage
+        .from(bucket)
+        .upload(filePath, fileBuffer, {
+          contentType: mimeType,
+          upsert: false
+        });
+
+      if (error) {
+        return res.status(500).json({
+          success: false,
+          message: error.message
+        });
+      }
+
+      const { data } = supabase.storage
+        .from(bucket)
+        .getPublicUrl(filePath);
+
+      return res.status(201).json({
+        success: true,
+        image_url: data.publicUrl,
+        url: data.publicUrl
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message || "Offer image upload failed"
+      });
+    }
+  }
+);
 
 // ================= PUBLIC APP CONFIG =================
 
@@ -1100,3 +1609,6 @@ app.post("/api/presence/heartbeat", (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
 });
+
+
+
