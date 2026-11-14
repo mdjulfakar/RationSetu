@@ -1,5 +1,3 @@
-
-
 <!doctype html>
 <html lang="hi">
 <head>
@@ -11,10 +9,11 @@
 body{margin:0;background:#f3f6fb;color:#172033;font:16px system-ui}
 header{background:#155eef;color:white;padding:18px;font-size:21px;font-weight:800}
 main{max-width:900px;margin:20px auto;padding:0 12px}
-.box,.order,.product{background:white;border-radius:13px;padding:16px;margin:12px 0;box-shadow:0 2px 12px #0001}
+.box,.order,.product,.offer{background:white;border-radius:13px;padding:16px;margin:12px 0;box-shadow:0 2px 12px #0001}
 h2{margin:0 0 12px}
 label{display:block;font-weight:650;margin:12px 0 5px}
-input,select,button{width:100%;padding:12px;border:1px solid #ccd4e0;border-radius:9px;font:inherit;background:white}
+input,select,button,textarea{width:100%;padding:12px;border:1px solid #ccd4e0;border-radius:9px;font:inherit;background:white}
+textarea{min-height:80px;resize:vertical}
 button{background:#155eef;color:white;border:0;font-weight:700;margin-top:12px}
 button.light{background:#e9efff;color:#1649a5}
 button.danger{background:#b42318}
@@ -25,46 +24,39 @@ button.gray{background:#667085}
 .msg{margin-top:10px;color:#b42318;overflow-wrap:anywhere}
 .good{color:#067647}
 .muted{color:#667085;font-size:14px}
-.order p,.product p{margin:5px 0;overflow-wrap:anywhere}
+.order p,.product p,.offer p{margin:5px 0;overflow-wrap:anywhere}
 .status{color:#155eef;font-weight:700}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .tabs button{width:auto;flex:1;min-width:110px;margin:0}
 .tabs button.active{background:#123b91}
 .product{display:flex;gap:12px;align-items:flex-start}
-.product img{width:88px;height:88px;object-fit:cover;border-radius:9px;background:#eef2f6}
-.product-info{flex:1;min-width:0}
-.product-actions{display:flex;gap:7px;flex-wrap:wrap}
-.product-actions button{width:auto;min-width:100px;margin:5px 0 0}
+.product img,.offer img{width:88px;height:88px;object-fit:cover;border-radius:9px;background:#eef2f6}
+.product-info,.offer-info{flex:1;min-width:0}
+.product-actions,.offer-actions{display:flex;gap:7px;flex-wrap:wrap}
+.product-actions button,.offer-actions button{width:auto;min-width:100px;margin:5px 0 0}
 .preview{max-width:140px;max-height:140px;object-fit:cover;border-radius:9px;margin-top:8px}
-
-/* GPS MAP BUTTON */
-.map-link{
-  display:inline-block;
-  margin:8px 0;
-  padding:10px 14px;
-  background:#e9efff;
-  color:#1649a5;
-  border-radius:9px;
-  font-weight:700;
-  text-decoration:none;
-}
-
+.map-link{display:inline-block;margin:8px 0;padding:10px 14px;background:#e9efff;color:#1649a5;border-radius:9px;font-weight:700;text-decoration:none}
+.reason{background:#fff8e6;border:1px solid #f4d58d;border-radius:9px;padding:12px;margin-top:10px;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:520px){
-  .product{align-items:flex-start}
-  .product img{width:72px;height:72px}
-  .product-actions button{flex:1}
+.product{align-items:flex-start}
+.product img,.offer img{width:72px;height:72px}
+.product-actions button,.offer-actions button{flex:1}
 }
 </style>
 </head>
 <body>
 <header>🛒 RationSetu — Admin Panel</header>
 <main>
+
 <section class="box" id="login">
 <h2>Admin Login</h2>
 <p class="muted">अपने Admin ID और Password से लॉगिन करें।</p>
-<label>Admin ID</label><input id="aid" autocomplete="username" placeholder="Admin ID">
-<label>Password</label><input id="pw" type="password" autocomplete="current-password" placeholder="Password">
-<button id="loginBtn">Login</button><div id="loginMsg" class="msg"></div>
+<label>Admin ID</label>
+<input id="aid" autocomplete="username" placeholder="Admin ID">
+<label>Password</label>
+<input id="pw" type="password" autocomplete="current-password" placeholder="Password">
+<button id="loginBtn">Login</button>
+<div id="loginMsg" class="msg"></div>
 </section>
 
 <section id="panel" class="hidden">
@@ -73,9 +65,11 @@ button.gray{background:#667085}
 <h2>RationSetu Admin</h2>
 <button class="light" id="logout">Logout</button>
 </div>
+
 <div class="tabs">
 <button class="active" data-tab="products" id="tabProducts">सामान / Products</button>
 <button class="light" data-tab="orders" id="tabOrders">ऑर्डर / Orders</button>
+<button class="light" data-tab="offers" id="tabOffers">ऑफर / Offers</button>
 <button class="light" data-tab="shop" id="tabShop">दुकान की लोकेशन</button>
 </div>
 </div>
@@ -84,20 +78,37 @@ button.gray{background:#667085}
 <div class="box">
 <h2>नया सामान जोड़ें</h2>
 <p class="muted">सामान का नाम, रेट, स्टॉक और फोटो भरकर सेव करें। फोटो JPG, PNG या WEBP होनी चाहिए (अधिकतम 6 MB)।</p>
-<label>सामान का नाम</label><input id="pName" placeholder="जैसे: आटा 5 किलो">
+
+<label>सामान का नाम</label>
+<input id="pName" placeholder="जैसे: आटा 5 किलो">
+
 <div class="row">
-<div><label>रेट (₹)</label><input id="pPrice" type="number" min="0" step="0.01" placeholder="0"></div>
-<div><label>स्टॉक / मात्रा</label><input id="pStock" type="number" min="0" step="1" placeholder="0"></div>
+<div>
+<label>रेट (₹)</label>
+<input id="pPrice" type="number" min="0" step="0.01" placeholder="0">
 </div>
-<label>कैटेगरी (वैकल्पिक)</label><input id="pCategory" placeholder="जैसे: राशन, तेल, दाल">
-<label>सामान की फोटो (वैकल्पिक)</label><input id="pImage" type="file" accept="image/jpeg,image/png,image/webp">
+<div>
+<label>स्टॉक / मात्रा</label>
+<input id="pStock" type="number" min="0" step="1" placeholder="0">
+</div>
+</div>
+
+<label>कैटेगरी (वैकल्पिक)</label>
+<input id="pCategory" placeholder="जैसे: राशन, तेल, दाल">
+
+<label>सामान की फोटो (वैकल्पिक)</label>
+<input id="pImage" type="file" accept="image/jpeg,image/png,image/webp">
 <img id="pPreview" class="preview hidden" alt="फोटो प्रीव्यू">
+
 <button id="addProductBtn">सामान जोड़ें</button>
 <div id="productFormMsg" class="msg"></div>
 </div>
 
 <div class="box">
-<div class="row"><h2>सभी सामान</h2><button class="light" id="refreshProducts">लिस्ट रिफ्रेश करें</button></div>
+<div class="row">
+<h2>सभी सामान</h2>
+<button class="light" id="refreshProducts">लिस्ट रिफ्रेश करें</button>
+</div>
 <p class="muted">यहाँ से रेट, स्टॉक, नाम और फोटो बदल सकते हैं। सामान को उपलब्ध या बंद भी कर सकते हैं।</p>
 <div id="productsList"><p class="muted">सामान लोड हो रहा है…</p></div>
 <div id="productsMsg" class="msg"></div>
@@ -106,8 +117,46 @@ button.gray{background:#667085}
 
 <section id="ordersTab" class="hidden">
 <div class="box">
-<div class="row"><h2>ऑर्डर / Orders</h2><button class="light" id="refresh">Refresh Orders</button></div>
-<div id="summary" class="muted"></div><div id="orders"></div><div id="ordersMsg" class="msg"></div>
+<div class="row">
+<h2>ऑर्डर / Orders</h2>
+<button class="light" id="refresh">Refresh Orders</button>
+</div>
+<div id="summary" class="muted"></div>
+<div id="orders"></div>
+<div id="ordersMsg" class="msg"></div>
+</div>
+</section>
+
+<!-- OFFER MANAGEMENT -->
+<section id="offersTab" class="hidden">
+<div class="box">
+<h2 id="offerFormHeading">नया ऑफर जोड़ें</h2>
+<p class="muted">ऑफर का शीर्षक और विवरण भरें। चाहें तो फोटो भी लगाएँ। ऑफर को चालू या बंद कर सकते हैं।</p>
+
+<label>ऑफर का नाम / Title</label>
+<input id="offerTitle" maxlength="200" placeholder="जैसे: आज की खास छूट">
+
+<label>ऑफर का विवरण</label>
+<textarea id="offerDescription" placeholder="ऑफर की जानकारी लिखें"></textarea>
+
+<label>ऑफर की फोटो (वैकल्पिक, JPG/PNG/WEBP, अधिकतम 6 MB)</label>
+<input id="offerImage" type="file" accept="image/jpeg,image/png,image/webp">
+<img id="offerPreview" class="preview hidden" alt="ऑफर फोटो प्रीव्यू">
+
+<div class="row">
+<button id="saveOfferBtn">ऑफर सेव करें</button>
+<button class="light" id="cancelOfferEdit">नया ऑफर / Cancel Edit</button>
+</div>
+<div id="offerFormMsg" class="msg"></div>
+</div>
+
+<div class="box">
+<div class="row">
+<h2>सभी ऑफर</h2>
+<button class="light" id="refreshOffers">Refresh Offers</button>
+</div>
+<div id="offersList"><p class="muted">ऑफर लोड हो रहे हैं…</p></div>
+<div id="offersMsg" class="msg"></div>
 </div>
 </section>
 
@@ -115,11 +164,21 @@ button.gray{background:#667085}
 <div class="box">
 <h2>दुकान की लोकेशन</h2>
 <p class="muted">दुकान के सही GPS coordinates ही भरें। अपनी वर्तमान लोकेशन यहाँ न डालें, यदि दुकान कहीं और है।</p>
-<label>Latitude</label><input id="lat" value="26.409748" inputmode="decimal">
-<label>Longitude</label><input id="lng" value="87.406212" inputmode="decimal">
-<label>दुकान का पता</label><input id="address" value="जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार">
-<label>सहायता मोबाइल नंबर</label><input id="phone" inputmode="tel">
-<button id="save">Save Shop Settings</button><div id="saveMsg" class="msg"></div>
+
+<label>Latitude</label>
+<input id="lat" value="26.409748" inputmode="decimal">
+
+<label>Longitude</label>
+<input id="lng" value="87.406212" inputmode="decimal">
+
+<label>दुकान का पता</label>
+<input id="address" value="जटवारा चौक, पौसी, वार्ड नंबर 2, कुर्साकांटा, अररिया, बिहार">
+
+<label>सहायता मोबाइल नंबर</label>
+<input id="phone" inputmode="tel">
+
+<button id="save">Save Shop Settings</button>
+<div id="saveMsg" class="msg"></div>
 </div>
 </section>
 </section>
@@ -128,165 +187,312 @@ button.gray{background:#667085}
 <script>
 const API='https://rationsetu-service.onrender.com';
 let token=sessionStorage.getItem('rs_admin')||'';
+
 const $=x=>document.getElementById(x);
-const headers=()=>({'Authorization':'Bearer '+token,'Content-Type':'application/json'});
-const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const headers=()=>({
+  'Authorization':'Bearer '+token,
+  'Content-Type':'application/json'
+});
+
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({
+  '&':'&amp;',
+  '<':'&lt;',
+  '>':'&gt;',
+  '"':'&quot;',
+  "'":'&#39;'
+}[c]));
+
 async function api(path,opt={}){
   const r=await fetch(API+path,opt);
-  let d={};try{d=await r.json()}catch{}
-  if(!r.ok||d.success===false)throw Error(d.message||d.error||'Request failed: '+r.status);
+  let d={};
+  try{d=await r.json()}catch{}
+  if(!r.ok||d.success===false){
+    throw Error(d.message||d.error||'Request failed: '+r.status);
+  }
   return d;
 }
+
 function showTab(tab){
-  ['products','orders','shop'].forEach(name=>{
+  ['products','orders','offers','shop'].forEach(name=>{
     $(name+'Tab').classList.toggle('hidden',name!==tab);
-    $('tab'+name[0].toUpperCase()+name.slice(1)).classList.toggle('active',name===tab);
-    $('tab'+name[0].toUpperCase()+name.slice(1)).classList.toggle('light',name!==tab);
+
+    $('tab'+name[0].toUpperCase()+name.slice(1))
+      .classList.toggle('active',name===tab);
+
+    $('tab'+name[0].toUpperCase()+name.slice(1))
+      .classList.toggle('light',name!==tab);
   });
+
   if(tab==='products')loadProducts();
   if(tab==='orders')loadOrders();
+  if(tab==='offers')loadOffers();
 }
-document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>showTab(b.dataset.tab)));
+
+document.querySelectorAll('[data-tab]').forEach(b=>{
+  b.addEventListener('click',()=>showTab(b.dataset.tab));
+});
 
 function view(){
   $('login').classList.toggle('hidden',!!token);
   $('panel').classList.toggle('hidden',!token);
   if(token)showTab('products');
 }
+
 $('loginBtn').onclick=async()=>{
   $('loginMsg').textContent='लॉगिन हो रहा है…';
+
   try{
     const d=await api('/api/admin/login',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({admin_id:$('aid').value.trim(),password:$('pw').value})
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        admin_id:$('aid').value.trim(),
+        password:$('pw').value
+      })
     });
-    token=d.token;sessionStorage.setItem('rs_admin',token);
-    $('loginMsg').textContent='';view();
-  }catch(e){$('loginMsg').textContent=e.message;}
+
+    token=d.token;
+    sessionStorage.setItem('rs_admin',token);
+    $('loginMsg').textContent='';
+    view();
+
+  }catch(e){
+    $('loginMsg').textContent=e.message;
+  }
 };
+
 $('logout').onclick=()=>{
-  token='';sessionStorage.removeItem('rs_admin');
-  $('orders').innerHTML='';$('productsList').innerHTML='';
+  token='';
+  sessionStorage.removeItem('rs_admin');
+  $('orders').innerHTML='';
+  $('productsList').innerHTML='';
+  $('offersList').innerHTML='';
   view();
 };
 
-/* ================= PRODUCTS: ADD / LIST / EDIT / AVAILABILITY ================= */
+/* PRODUCTS */
+
 let editingProductId=null;
 let editingImageUrl='';
+
 $('pImage').addEventListener('change',()=>{
   const file=$('pImage').files[0];
-  if(!file){$('pPreview').classList.add('hidden');return;}
+
+  if(!file){
+    $('pPreview').classList.add('hidden');
+    return;
+  }
+
   if(file.size>6*1024*1024){
     $('productFormMsg').textContent='फोटो 6 MB से छोटी होनी चाहिए।';
-    $('pImage').value='';$('pPreview').classList.add('hidden');return;
+    $('pImage').value='';
+    $('pPreview').classList.add('hidden');
+    return;
   }
+
   $('pPreview').src=URL.createObjectURL(file);
   $('pPreview').classList.remove('hidden');
 });
-async function uploadProductImage(file){
-  const form=new FormData();form.append('file',file);
-  const r=await fetch(API+'/api/admin/products/upload-image',{
-    method:'POST',headers:{'Authorization':'Bearer '+token},body:form
+
+async function uploadImage(file,endpoint){
+  const form=new FormData();
+  form.append('file',file);
+
+  const r=await fetch(API+endpoint,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+token},
+    body:form
   });
-  let d={};try{d=await r.json()}catch{}
-  if(!r.ok||d.success===false)throw Error(d.message||'फोटो अपलोड नहीं हुई।');
+
+  let d={};
+  try{d=await r.json()}catch{}
+
+  if(!r.ok||d.success===false){
+    throw Error(d.message||'फोटो अपलोड नहीं हुई।');
+  }
+
   return d.image_url||d.url;
 }
+
 function resetProductForm(){
-  editingProductId=null;editingImageUrl='';
-  $('pName').value='';$('pPrice').value='';$('pStock').value='';
-  $('pCategory').value='';$('pImage').value='';
-  $('pPreview').src='';$('pPreview').classList.add('hidden');
+  editingProductId=null;
+  editingImageUrl='';
+  $('pName').value='';
+  $('pPrice').value='';
+  $('pStock').value='';
+  $('pCategory').value='';
+  $('pImage').value='';
+  $('pPreview').src='';
+  $('pPreview').classList.add('hidden');
   $('addProductBtn').textContent='सामान जोड़ें';
 }
+
 $('addProductBtn').onclick=async()=>{
   const name=$('pName').value.trim();
   const price=$('pPrice').value;
   const stock=$('pStock').value;
-  if(!name||price===''||stock===''||Number(price)<0||!Number.isInteger(Number(stock))||Number(stock)<0){
-    $('productFormMsg').textContent='सामान का नाम, सही रेट और सही स्टॉक भरें।';return;
+
+  if(!name||price===''||stock===''||Number(price)<0||
+     !Number.isInteger(Number(stock))||Number(stock)<0){
+    $('productFormMsg').textContent='सामान का नाम, सही रेट और सही स्टॉक भरें।';
+    return;
   }
-  $('addProductBtn').disabled=true;$('productFormMsg').textContent='सेव हो रहा है…';
+
+  $('addProductBtn').disabled=true;
+  $('productFormMsg').textContent='सेव हो रहा है…';
+
   try{
     let image_url=editingImageUrl;
     const file=$('pImage').files[0];
-    if(file)image_url=await uploadProductImage(file);
-    const body={name,price:Number(price),stock:Number(stock),category:$('pCategory').value.trim(),image_url:image_url||null};
+
+    if(file){
+      image_url=await uploadImage(
+        file,
+        '/api/admin/products/upload-image'
+      );
+    }
+
+    const body={
+      name,
+      price:Number(price),
+      stock:Number(stock),
+      category:$('pCategory').value.trim(),
+      image_url:image_url||null
+    };
+
     if(editingProductId){
       await api('/api/admin/products/'+encodeURIComponent(editingProductId),{
-        method:'PATCH',headers:headers(),body:JSON.stringify(body)
+        method:'PATCH',
+        headers:headers(),
+        body:JSON.stringify(body)
       });
+
       $('productFormMsg').textContent='सामान अपडेट हो गया।';
+
     }else{
       await api('/api/admin/products',{
-        method:'POST',headers:headers(),body:JSON.stringify(body)
+        method:'POST',
+        headers:headers(),
+        body:JSON.stringify(body)
       });
+
       $('productFormMsg').textContent='नया सामान जोड़ दिया गया।';
     }
-    resetProductForm();loadProducts();
-  }catch(e){$('productFormMsg').textContent=e.message;}
-  finally{$('addProductBtn').disabled=false;}
+
+    resetProductForm();
+    loadProducts();
+
+  }catch(e){
+    $('productFormMsg').textContent=e.message;
+  }finally{
+    $('addProductBtn').disabled=false;
+  }
 };
+
 async function loadProducts(){
   $('productsMsg').textContent='सामान लोड हो रहा है…';
+
   try{
     const d=await api('/api/admin/products',{headers:headers()});
     const items=d.products||[];
-    if(!items.length){
-      $('productsList').innerHTML='<p>अभी कोई सामान नहीं जोड़ा गया है। ऊपर से नया सामान जोड़ें।</p>';
-    }else{
-      $('productsList').innerHTML=items.map(p=>`
+
+    $('productsList').innerHTML=items.length
+      ?items.map(p=>`
         <article class="product">
-          <img src="${esc(p.image_url||'')}" alt="" onerror="this.style.display='none'">
+          <img src="${esc(p.image_url||'')}" alt=""
+               onerror="this.style.display='none'">
           <div class="product-info">
             <b>${esc(p.name)}</b>
             <p>रेट: ₹${esc(p.price)} | स्टॉक: ${esc(p.stock)}</p>
             <p>कैटेगरी: ${esc(p.category||'—')}</p>
             <p class="status">${p.is_active?'उपलब्ध':'बंद / Unavailable'}</p>
             <div class="product-actions">
-              <button class="light" onclick="editProduct('${encodeURIComponent(p.id)}')">बदलें / Edit</button>
-              <button class="${p.is_active?'danger':'gray'}" onclick="toggleProduct('${encodeURIComponent(p.id)}',${!p.is_active})">${p.is_active?'बंद करें':'फिर उपलब्ध करें'}</button>
+              <button class="light"
+                onclick="editProduct('${encodeURIComponent(p.id)}')">
+                बदलें / Edit
+              </button>
+              <button class="${p.is_active?'danger':'gray'}"
+                onclick="toggleProduct('${encodeURIComponent(p.id)}',${!p.is_active})">
+                ${p.is_active?'बंद करें':'फिर उपलब्ध करें'}
+              </button>
             </div>
           </div>
-        </article>`).join('');
-    }
+        </article>
+      `).join('')
+      :'<p>अभी कोई सामान नहीं जोड़ा गया है। ऊपर से नया सामान जोड़ें।</p>';
+
     $('productsMsg').textContent='';
+
   }catch(e){
     $('productsMsg').textContent='सामान की लिस्ट नहीं खुली: '+e.message;
-    $('productsList').innerHTML='<p class="muted">अगर API route अभी server.js में नहीं जोड़ा गया है, तो लिस्ट नहीं खुलेगी।</p>';
-    if(/401|login required/i.test(e.message))$('logout').click();
+    $('productsList').innerHTML='<p class="muted">API route या नेटवर्क जाँचें।</p>';
+
+    if(/401|login required/i.test(e.message)){
+      $('logout').click();
+    }
   }
 }
-window.editProduct=async encodedId=>{
-  const id=decodeURIComponent(encodedId);
+
+window.editProduct=async id=>{
+  id=decodeURIComponent(id);
+
   try{
     const d=await api('/api/admin/products',{headers:headers()});
     const p=(d.products||[]).find(x=>String(x.id)===String(id));
+
     if(!p)throw Error('यह सामान लिस्ट में नहीं मिला।');
-    editingProductId=p.id;editingImageUrl=p.image_url||'';
-    $('pName').value=p.name||'';$('pPrice').value=p.price??'';
-    $('pStock').value=p.stock??'';$('pCategory').value=p.category||'';
+
+    editingProductId=p.id;
+    editingImageUrl=p.image_url||'';
+
+    $('pName').value=p.name||'';
+    $('pPrice').value=p.price??'';
+    $('pStock').value=p.stock??'';
+    $('pCategory').value=p.category||'';
     $('pImage').value='';
-    if(p.image_url){$('pPreview').src=p.image_url;$('pPreview').classList.remove('hidden');}
-    else $('pPreview').classList.add('hidden');
+
+    if(p.image_url){
+      $('pPreview').src=p.image_url;
+      $('pPreview').classList.remove('hidden');
+    }else{
+      $('pPreview').classList.add('hidden');
+    }
+
     $('addProductBtn').textContent='बदलाव सेव करें';
-    $('productFormMsg').textContent='अब ऊपर नाम, रेट, स्टॉक या नई फोटो बदलकर सेव करें।';
+    $('productFormMsg').textContent='अब ऊपर बदलाव करके सेव करें।';
     window.scrollTo({top:0,behavior:'smooth'});
-  }catch(e){$('productsMsg').textContent=e.message;}
+
+  }catch(e){
+    $('productsMsg').textContent=e.message;
+  }
 };
-window.toggleProduct=async(encodedId,active)=>{
-  const id=decodeURIComponent(encodedId);
-  if(!confirm(active?'इस सामान को फिर उपलब्ध करना है?':'इस सामान को अभी ग्राहकों के लिए बंद करना है?'))return;
+
+window.toggleProduct=async(id,active)=>{
+  id=decodeURIComponent(id);
+
+  if(!confirm(active
+    ?'इस सामान को फिर उपलब्ध करना है?'
+    :'इस सामान को ग्राहकों के लिए बंद करना है?'))return;
+
   try{
     await api('/api/admin/products/'+encodeURIComponent(id),{
-      method:'PATCH',headers:headers(),body:JSON.stringify({is_active:active})
+      method:'PATCH',
+      headers:headers(),
+      body:JSON.stringify({is_active:active})
     });
-    $('productsMsg').textContent='सामान की उपलब्धता अपडेट हो गई।';loadProducts();
-  }catch(e){$('productsMsg').textContent=e.message;}
+
+    $('productsMsg').textContent='सामान की उपलब्धता अपडेट हो गई।';
+    loadProducts();
+
+  }catch(e){
+    $('productsMsg').textContent=e.message;
+  }
 };
+
 $('refreshProducts').onclick=loadProducts;
 
-/* ================= GPS LOCATION FOR EVERY ORDER ================= */
+/* ORDER LOCATION AND CANCELLATION REASON */
+
 function orderMapUrl(o){
   const lat=o.customer_lat;
   const lng=o.customer_lng;
@@ -294,71 +500,352 @@ function orderMapUrl(o){
   const hasCoords=
     lat!==null&&lat!==undefined&&String(lat).trim()!==''&&
     lng!==null&&lng!==undefined&&String(lng).trim()!==''&&
-    Number.isFinite(Number(lat))&&Number.isFinite(Number(lng));
+    Number.isFinite(Number(lat))&&
+    Number.isFinite(Number(lng));
 
-  const query=hasCoords
-    ?Number(lat)+','+Number(lng)
-    :String(o.address||'').trim();
-
-  return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(query);
+  return 'https://www.google.com/maps/search/?api=1&query='+
+    encodeURIComponent(
+      hasCoords
+        ?Number(lat)+','+Number(lng)
+        :String(o.address||'').trim()
+    );
 }
 
-/* ================= ORDERS SECTION ================= */
 $('refresh').onclick=loadOrders;
+
 async function loadOrders(){
   $('ordersMsg').textContent='लोड हो रहा है…';
+
   try{
     const d=await api('/api/admin/orders',{headers:headers()});
-    const a=d.orders||[];$('summary').textContent='कुल ऑर्डर: '+a.length;
-    $('orders').innerHTML=a.length?a.map(o=>`
-      <article class="order">
-        <b>${esc(o.customer_name)} — ₹${esc(o.total_amount)}</b>
-        <p>मोबाइल: ${esc(o.mobile)}</p>
-        <p>पता: ${esc(o.address)}</p>
+    const a=d.orders||[];
 
-        <a class="map-link"
-           href="${esc(orderMapUrl(o))}"
-           target="_blank"
-           rel="noopener noreferrer">📍 GPS लोकेशन देखें / Google Maps</a>
+    $('summary').textContent='कुल ऑर्डर: '+a.length;
 
-        <p>आइटम: ${esc(JSON.stringify(o.items||[]))}</p>
-        <p>स्थिति: <span class="status">${esc(o.status)}</span></p>
-        <div class="row">
-          <select id="s${esc(o.id)}">${['Pending','Accepted','Preparing','Out for Delivery','Delivered','Cancelled'].map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select>
-          <button onclick="changeStatus('${encodeURIComponent(o.id)}')">स्थिति बदलें</button>
-        </div>
-      </article>`).join(''):'<p>अभी कोई ऑर्डर नहीं है।</p>';
+    $('orders').innerHTML=a.length?a.map(o=>{
+      const cancelled=String(o.status||'').toLowerCase()==='cancelled';
+
+      return `
+        <article class="order">
+          <b>${esc(o.customer_name)} — ₹${esc(o.total_amount)}</b>
+          <p>मोबाइल: ${esc(o.mobile)}</p>
+          <p>पता: ${esc(o.address)}</p>
+
+          <a class="map-link"
+             href="${esc(orderMapUrl(o))}"
+             target="_blank"
+             rel="noopener noreferrer">
+             📍 GPS लोकेशन देखें / Google Maps
+          </a>
+
+          <p>आइटम: ${esc(JSON.stringify(o.items||[]))}</p>
+          <p>स्थिति: <span class="status">${esc(o.status)}</span></p>
+
+          ${cancelled?`
+            <button class="light"
+              onclick="viewCancelReason('${encodeURIComponent(o.id)}')">
+              Reason देखें
+            </button>
+            <div id="reason-${esc(o.id)}" class="reason hidden"></div>
+          `:''}
+
+          <div class="row">
+            <select id="s${esc(o.id)}">
+              ${['Pending','Accepted','Preparing','Out for Delivery','Delivered','Cancelled']
+                .map(s=>`
+                  <option ${s.toLowerCase()===String(o.status||'').toLowerCase()?'selected':''}>
+                    ${s}
+                  </option>
+                `).join('')}
+            </select>
+
+            <button onclick="changeStatus('${encodeURIComponent(o.id)}')">
+              स्थिति बदलें
+            </button>
+          </div>
+        </article>
+      `;
+    }).join(''):'<p>अभी कोई ऑर्डर नहीं है।</p>';
+
     $('ordersMsg').textContent='';
+
   }catch(e){
     $('ordersMsg').textContent=e.message;
-    if(/401|login required/i.test(e.message))$('logout').click();
+
+    if(/401|login required/i.test(e.message)){
+      $('logout').click();
+    }
   }
 }
-window.changeStatus=async id=>{
-  const decoded=decodeURIComponent(id);
+
+window.viewCancelReason=async encodedId=>{
+  const id=decodeURIComponent(encodedId);
+  const el=$('reason-'+id);
+
+  if(!el)return;
+
   try{
-    await api('/api/admin/orders/'+encodeURIComponent(decoded),{
-      method:'PATCH',headers:headers(),
-      body:JSON.stringify({status:$('s'+decoded).value})
-    });
-    $('ordersMsg').textContent='स्थिति अपडेट हो गई।';loadOrders();
-  }catch(e){$('ordersMsg').textContent=e.message;}
+    const d=await api('/api/admin/orders',{headers:headers()});
+    const order=(d.orders||[]).find(x=>String(x.id)===String(id));
+
+    const reason=order&&(
+      order.cancellation_reason||
+      order.cancel_reason||
+      order.cancellationReason
+    );
+
+    el.textContent=reason
+      ?String(reason)
+      :'इस ऑर्डर के रिकॉर्ड में cancellation reason नहीं मिला।';
+
+    el.classList.remove('hidden');
+
+  }catch(e){
+    el.textContent='कारण लोड नहीं हुआ: '+e.message;
+    el.classList.remove('hidden');
+  }
 };
 
-/* ================= SHOP LOCATION SECTION ================= */
+window.changeStatus=async encodedId=>{
+  const id=decodeURIComponent(encodedId);
+
+  try{
+    await api('/api/admin/orders/'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:headers(),
+      body:JSON.stringify({status:$('s'+id).value})
+    });
+
+    $('ordersMsg').textContent='स्थिति अपडेट हो गई।';
+    loadOrders();
+
+  }catch(e){
+    $('ordersMsg').textContent=e.message;
+  }
+};
+
+/* OFFER MANAGEMENT */
+
+let editingOfferId=null;
+let editingOfferImage='';
+
+$('offerImage').addEventListener('change',()=>{
+  const f=$('offerImage').files[0];
+
+  if(!f){
+    $('offerPreview').classList.add('hidden');
+    return;
+  }
+
+  if(f.size>6*1024*1024){
+    $('offerFormMsg').textContent='फोटो 6 MB से छोटी होनी चाहिए।';
+    $('offerImage').value='';
+    return;
+  }
+
+  $('offerPreview').src=URL.createObjectURL(f);
+  $('offerPreview').classList.remove('hidden');
+});
+
+function resetOfferForm(){
+  editingOfferId=null;
+  editingOfferImage='';
+  $('offerTitle').value='';
+  $('offerDescription').value='';
+  $('offerImage').value='';
+  $('offerPreview').src='';
+  $('offerPreview').classList.add('hidden');
+  $('offerFormHeading').textContent='नया ऑफर जोड़ें';
+  $('saveOfferBtn').textContent='ऑफर सेव करें';
+}
+
+$('cancelOfferEdit').onclick=resetOfferForm;
+
+$('saveOfferBtn').onclick=async()=>{
+  const title=$('offerTitle').value.trim();
+
+  if(!title){
+    $('offerFormMsg').textContent='ऑफर का नाम लिखें।';
+    return;
+  }
+
+  $('saveOfferBtn').disabled=true;
+  $('offerFormMsg').textContent='ऑफर सेव हो रहा है…';
+
+  try{
+    let image_url=editingOfferImage;
+    const file=$('offerImage').files[0];
+
+    if(file){
+      image_url=await uploadImage(
+        file,
+        '/api/admin/offers/upload-image'
+      );
+    }
+
+    const body={
+      title,
+      description:$('offerDescription').value.trim(),
+      image_url:image_url||''
+    };
+
+    if(editingOfferId){
+      await api('/api/admin/offers/'+encodeURIComponent(editingOfferId),{
+        method:'PATCH',
+        headers:headers(),
+        body:JSON.stringify(body)
+      });
+
+      $('offerFormMsg').textContent='ऑफर अपडेट हो गया।';
+
+    }else{
+      await api('/api/admin/offers',{
+        method:'POST',
+        headers:headers(),
+        body:JSON.stringify(body)
+      });
+
+      $('offerFormMsg').textContent='नया ऑफर सेव हो गया।';
+    }
+
+    resetOfferForm();
+    loadOffers();
+
+  }catch(e){
+    $('offerFormMsg').textContent=e.message;
+  }finally{
+    $('saveOfferBtn').disabled=false;
+  }
+};
+
+async function loadOffers(){
+  $('offersMsg').textContent='ऑफर लोड हो रहे हैं…';
+
+  try{
+    const d=await api('/api/admin/offers',{headers:headers()});
+    const a=d.offers||[];
+
+    $('offersList').innerHTML=a.length?a.map(o=>`
+      <article class="offer product">
+        <img src="${esc(o.image_url||'')}" alt=""
+             onerror="this.style.display='none'">
+
+        <div class="offer-info">
+          <b>${esc(o.title)}</b>
+          <p>${esc(o.description||'')}</p>
+          <p class="status">
+            ${o.is_active?'चालू / Active':'बंद / Inactive'}
+          </p>
+
+          <div class="offer-actions">
+            <button class="light"
+              onclick="editOffer('${encodeURIComponent(o.id)}')">
+              Edit
+            </button>
+
+            <button class="${o.is_active?'danger':'gray'}"
+              onclick="toggleOffer('${encodeURIComponent(o.id)}',${!o.is_active})">
+              ${o.is_active?'बंद करें':'चालू करें'}
+            </button>
+          </div>
+        </div>
+      </article>
+    `).join(''):'<p>अभी कोई ऑफर नहीं है। ऊपर से नया ऑफर जोड़ें।</p>';
+
+    $('offersMsg').textContent='';
+
+  }catch(e){
+    $('offersMsg').textContent='ऑफर लोड नहीं हुए: '+e.message;
+    $('offersList').innerHTML='<p class="muted">ऑफर API या Supabase table जाँचें।</p>';
+
+    if(/401|login required/i.test(e.message)){
+      $('logout').click();
+    }
+  }
+}
+
+window.editOffer=async encodedId=>{
+  const id=decodeURIComponent(encodedId);
+
+  try{
+    const d=await api('/api/admin/offers',{headers:headers()});
+    const o=(d.offers||[]).find(x=>String(x.id)===String(id));
+
+    if(!o)throw Error('ऑफर नहीं मिला।');
+
+    editingOfferId=o.id;
+    editingOfferImage=o.image_url||'';
+
+    $('offerTitle').value=o.title||'';
+    $('offerDescription').value=o.description||'';
+    $('offerImage').value='';
+
+    if(o.image_url){
+      $('offerPreview').src=o.image_url;
+      $('offerPreview').classList.remove('hidden');
+    }else{
+      $('offerPreview').classList.add('hidden');
+    }
+
+    $('offerFormHeading').textContent='ऑफर एडिट करें';
+    $('saveOfferBtn').textContent='बदलाव सेव करें';
+    $('offerFormMsg').textContent='बदलाव करके सेव करें।';
+
+    window.scrollTo({top:0,behavior:'smooth'});
+
+  }catch(e){
+    $('offersMsg').textContent=e.message;
+  }
+};
+
+window.toggleOffer=async(encodedId,active)=>{
+  const id=decodeURIComponent(encodedId);
+
+  if(!confirm(active
+    ?'इस ऑफर को चालू करना है?'
+    :'इस ऑफर को बंद करना है?'))return;
+
+  try{
+    await api('/api/admin/offers/'+encodeURIComponent(id),{
+      method:'PATCH',
+      headers:headers(),
+      body:JSON.stringify({is_active:active})
+    });
+
+    $('offersMsg').textContent='ऑफर की स्थिति अपडेट हो गई।';
+    loadOffers();
+
+  }catch(e){
+    $('offersMsg').textContent=e.message;
+  }
+};
+
+$('refreshOffers').onclick=loadOffers;
+
+/* SHOP SETTINGS */
+
 $('save').onclick=async()=>{
   $('saveMsg').textContent='सेव हो रहा है…';
+
   try{
     const d=await api('/api/admin/config',{
-      method:'POST',headers:headers(),
+      method:'POST',
+      headers:headers(),
       body:JSON.stringify({
-        shop_lat:$('lat').value,shop_lng:$('lng').value,
-        shop_address:$('address').value,support_phone:$('phone').value
+        shop_lat:$('lat').value,
+        shop_lng:$('lng').value,
+        shop_address:$('address').value,
+        support_phone:$('phone').value
       })
     });
+
     $('saveMsg').textContent=d.message||'सेटिंग सेव हो गई।';
-  }catch(e){$('saveMsg').textContent=e.message;}
+
+  }catch(e){
+    $('saveMsg').textContent=e.message;
+  }
 };
+
 view();
 </script>
 </body>
