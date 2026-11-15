@@ -439,10 +439,11 @@ export default function App() {
           AsyncStorage.getItem('rationsetu_verified_phone'),
         ]);
         if (active && savedToken && savedPhone) {
-          setCustomerToken(savedToken);
-          setVerifiedPhone(savedPhone);
-          setPhone(savedPhone);
-        } setScreen('home');
+  setCustomerToken(savedToken);
+  setVerifiedPhone(savedPhone);
+  setPhone(savedPhone);
+  setScreen('home');
+}
       } catch (error) {
         console.log('Customer session restore error:', error);
       }
