@@ -57,6 +57,24 @@ const translations = {
     customerName: 'ग्राहक का नाम',
     mobile: '10 अंकों का मोबाइल नंबर',
     fullAddress: 'पूरा घर का पता',
+    pinCode: '6 अंकों का PIN Code',
+    sendOtp: 'OTP भेजें',
+    verifyOtp: 'OTP सत्यापित करें',
+    enterOtp: '6 अंकों का OTP',
+    otpSent: 'OTP भेज दिया गया है।',
+    otpVerified: 'मोबाइल नंबर सत्यापित हो गया।',
+    otpRequired: 'ऑर्डर से पहले मोबाइल OTP सत्यापित करें।',
+    offers: 'आज के ऑफर',
+    offerTitle: 'ऑफर का शीर्षक',
+    offerDescription: 'ऑफर का विवरण',
+    addOffer: 'ऑफर जोड़ें',
+    saveOffer: 'ऑफर सेव करें',
+    editOffer: 'ऑफर एडिट करें',
+    activateOffer: 'ऑफर चालू करें',
+    deactivateOffer: 'ऑफर बंद करें',
+    chooseOfferImage: 'ऑफर की फोटो चुनें',
+    reasonView: 'Reason देखें',
+    pinRequired: 'सही 6 अंकों का PIN Code भरें।',
     total: 'कुल',
     paymentCod: 'भुगतान: सामान मिलने पर नकद (COD)',
     sendOrder: 'COD ऑर्डर भेजें',
@@ -175,6 +193,24 @@ const translations = {
     customerName: 'Customer name',
     mobile: '10-digit mobile number',
     fullAddress: 'Full home address',
+    pinCode: '6-digit PIN Code',
+    sendOtp: 'Send OTP',
+    verifyOtp: 'Verify OTP',
+    enterOtp: '6-digit OTP',
+    otpSent: 'OTP has been sent.',
+    otpVerified: 'Mobile number verified.',
+    otpRequired: 'Verify your mobile number with OTP before ordering.',
+    offers: 'Today’s Offers',
+    offerTitle: 'Offer title',
+    offerDescription: 'Offer description',
+    addOffer: 'Add Offer',
+    saveOffer: 'Save Offer',
+    editOffer: 'Edit Offer',
+    activateOffer: 'Activate Offer',
+    deactivateOffer: 'Deactivate Offer',
+    chooseOfferImage: 'Choose Offer Image',
+    reasonView: 'View Reason',
+    pinRequired: 'Enter a valid 6-digit PIN Code.',
     total: 'Total',
     paymentCod: 'Payment: Cash on Delivery (COD)',
     sendOrder: 'Place COD Order',
@@ -363,6 +399,16 @@ export default function App() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [pinCode, setPinCode] = useState('');
+  const [customerOtp, setCustomerOtp] = useState('');
+  const [customerToken, setCustomerToken] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [verifiedPhone, setVerifiedPhone] = useState('');
+  const [offers, setOffers] = useState([]);
+  const [newOfferTitle, setNewOfferTitle] = useState('');
+  const [newOfferDescription, setNewOfferDescription] = useState('');
+  const [newOfferImage, setNewOfferImage] = useState(null);
+  const [editingOfferId, setEditingOfferId] = useState('');
   const [search, setSearch] = useState('');
   const [cancellationOrder, setCancellationOrder] = useState(null);
   const [cancellationReason, setCancellationReason] = useState('');
@@ -384,7 +430,24 @@ export default function App() {
   const [presenceClientId, setPresenceClientId] = useState('');
 
   useEffect(() => {
+    loadOffers();
     let active = true;
+    (async () => {
+      try {
+        const [savedToken, savedPhone] = await Promise.all([
+          AsyncStorage.getItem('rationsetu_customer_token'),
+          AsyncStorage.getItem('rationsetu_verified_phone'),
+        ]);
+        if (active && savedToken && savedPhone) {
+          setCustomerToken(savedToken);
+          setVerifiedPhone(savedPhone);
+          setPhone(savedPhone);
+        }
+      } catch (error) {
+        console.log('Customer session restore error:', error);
+      }
+    })();
+
     let interval = null;
     let appStateSubscription = null;
 
@@ -609,6 +672,274 @@ export default function App() {
       customer_lat: position.coords.latitude,
       customer_lng: position.coords.longitude,
     };
+  }   async function sendCustomerOtp() {
+    const mobile = phone.trim();
+
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      Alert.alert(t('wrongMobile'), t('fillMobile'));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await apiRequest('/api/customer/otp/send', {
+        method: 'POST',
+        body: JSON.stringify({phone: mobile}),
+      });
+
+      if (!result.success) {
+        throw new Error(result.message || t('uploadFailed'));
+      }
+
+      setOtpSent(true);
+      setCustomerOtp('');
+      setVerifiedPhone('');
+      setCustomerToken('');
+
+      await AsyncStorage.removeItem('rationsetu_customer_token');
+      await AsyncStorage.removeItem('rationsetu_verified_phone');
+
+      Alert.alert(t('success'), result.message || t('otpSent'));
+    } catch (error) {
+      Alert.alert(t('wrongInfo'), error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyCustomerOtp() {
+    const mobile = phone.trim();
+    const otp = customerOtp.trim();
+
+    if (!/^[6-9]\d{9}$/.test(mobile)) {
+      Alert.alert(t('wrongMobile'), t('fillMobile'));
+      return;
+    }
+
+    if (!/^\d{4,10}$/.test(otp)) {
+      Alert.alert(t('infoIncomplete'), t('enterOtp'));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await apiRequest('/api/customer/otp/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+          phone: mobile,
+          otp,
+        }),
+      });
+
+      if (!result.success || !result.customer_token) {
+        throw new Error(result.message || t('otpRequired'));
+      }
+
+      setCustomerToken(result.customer_token);
+      setVerifiedPhone(mobile);
+      setOtpSent(false);
+
+      await AsyncStorage.setItem(
+        'rationsetu_customer_token',
+        result.customer_token,
+      );
+      await AsyncStorage.setItem(
+        'rationsetu_verified_phone',
+        mobile,
+      );
+
+      Alert.alert(t('success'), result.message || t('otpVerified'));
+    } catch (error) {
+      Alert.alert(t('wrongInfo'), error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadOffers() {
+    try {
+      const result = await apiRequest('/api/offers');
+
+      if (result.success && Array.isArray(result.offers)) {
+        setOffers(result.offers);
+      }
+    } catch (error) {
+      console.log('Offers load error:', error.message);
+    }
+  }
+
+  async function loadAdminOffers(token = adminToken) {
+    if (!token) return;
+
+    try {
+      const result = await apiRequest('/api/admin/offers', {}, token);
+
+      if (result.success && Array.isArray(result.offers)) {
+        setOffers(result.offers);
+      }
+    } catch (error) {
+      Alert.alert(t('ordersNotLoaded'), error.message);
+    }
+  }
+
+  async function uploadOfferImage(photo) {
+    if (!photo?.uri) {
+      throw new Error(t('uploadFailed'));
+    }
+
+    const form = new FormData();
+    form.append('file', {
+      uri: photo.uri,
+      name: photo.fileName || `offer-${Date.now()}.jpg`,
+      type: photo.mimeType || 'image/jpeg',
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/admin/offers/upload-image`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: form,
+      },
+    );
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || result.error || t('uploadFailed'));
+    }
+
+    const imageUrl = result.image_url || result.url;
+
+    if (!imageUrl) {
+      throw new Error(t('uploadFailed'));
+    }
+
+    return imageUrl;
+  }
+
+  async function chooseOfferPhoto() {
+    const photo = await chooseProductImage();
+
+    if (photo) {
+      setNewOfferImage(photo);
+    }
+  }
+
+  async function saveOffer() {
+    if (!newOfferTitle.trim()) {
+      Alert.alert(t('infoIncomplete'), t('offerTitle'));
+      return;
+    }
+
+    if (!adminToken) {
+      Alert.alert(t('adminError'), t('adminFailed'));
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let imageUrl = newOfferImage?.uri
+        ? await uploadOfferImage(newOfferImage)
+        : '';
+
+      const existingOffer = offers.find(
+        item => String(item.id) === String(editingOfferId),
+      );
+
+      if (!imageUrl && existingOffer) {
+        imageUrl = existingOffer.image_url || '';
+      }
+
+      const payload = {
+        title: newOfferTitle.trim(),
+        description: newOfferDescription.trim(),
+        image_url: imageUrl,
+      };
+
+      const isEditing = Boolean(editingOfferId);
+
+      const result = await apiRequest(
+        isEditing
+          ? `/api/admin/offers/${encodeURIComponent(editingOfferId)}`
+          : '/api/admin/offers',
+        {
+          method: isEditing ? 'PATCH' : 'POST',
+          body: JSON.stringify(payload),
+        },
+        adminToken,
+      );
+
+      if (!result.success || !result.offer) {
+        throw new Error(result.message || t('uploadFailed'));
+      }
+
+      setOffers(previous => {
+        if (isEditing) {
+          return previous.map(item =>
+            String(item.id) === String(result.offer.id)
+              ? result.offer
+              : item,
+          );
+        }
+
+        return [result.offer, ...previous];
+      });
+
+      setNewOfferTitle('');
+      setNewOfferDescription('');
+      setNewOfferImage(null);
+      setEditingOfferId('');
+
+      Alert.alert(t('success'), t('changesSaved'));
+    } catch (error) {
+      Alert.alert(t('uploadFailed'), error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function startEditOffer(offer) {
+    setEditingOfferId(String(offer.id));
+    setNewOfferTitle(offer.title || '');
+    setNewOfferDescription(offer.description || '');
+    setNewOfferImage(null);
+  }
+
+  async function toggleOffer(offer) {
+    if (!adminToken || !offer?.id) return;
+
+    try {
+      const result = await apiRequest(
+        `/api/admin/offers/${encodeURIComponent(offer.id)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            is_active: !offer.is_active,
+          }),
+        },
+        adminToken,
+      );
+
+      if (!result.success || !result.offer) {
+        throw new Error(result.message || t('changesFailed'));
+      }
+
+      setOffers(previous =>
+        previous.map(item =>
+          String(item.id) === String(offer.id)
+            ? result.offer
+            : item,
+        ),
+      );
+
+      Alert.alert(t('success'), t('changesSaved'));
+    } catch (error) {
+      Alert.alert(t('changesFailed'), error.message);
+    }
   }
 
   async function placeOrder() {
@@ -618,22 +949,36 @@ export default function App() {
       Alert.alert(t('infoIncomplete'), t('fillName'));
       return;
     }
+
     if (!/^[0-9]{10}$/.test(phone.trim())) {
       Alert.alert(t('wrongMobile'), t('fillMobile'));
       return;
     }
+
     if (!address.trim()) {
       Alert.alert(t('addressIncomplete'), t('fillAddress'));
+      return;
+    }
+
+    if (!/^\d{6}$/.test(pinCode.trim())) {
+      Alert.alert(t('addressIncomplete'), t('pinRequired'));
+      return;
+    }
+
+    if (!customerToken || verifiedPhone !== phone.trim()) {
+      Alert.alert(t('otpRequired'), t('otpRequired'));
       return;
     }
 
     const selectedItems = Object.entries(cart)
       .filter(
         ([id, quantity]) =>
-          quantity > 0 && data.products.some(product => product.id === id),
+          quantity > 0 &&
+          data.products.some(product => product.id === id),
       )
       .map(([id, quantity]) => {
         const product = data.products.find(item => item.id === id);
+
         return {
           name: product.name,
           price: product.price,
@@ -653,14 +998,18 @@ export default function App() {
     );
 
     setLoading(true);
+
     try {
       const customerLocation = await getCustomerLocation();
+
       const result = await apiRequest('/api/orders', {
         method: 'POST',
         body: JSON.stringify({
           customer_name: name.trim(),
           mobile: phone.trim(),
           address: address.trim(),
+          pin_code: pinCode.trim(),
+          customer_token: customerToken,
           items: selectedItems,
           total_amount: orderTotal,
           customer_lat: customerLocation.customer_lat,
@@ -680,19 +1029,23 @@ export default function App() {
         items: result.order.items || selectedItems,
         total_amount: result.order.total_amount ?? orderTotal,
         customer_order_token:
-          result.customer_order_token || result.order.customer_order_token,
+          result.customer_order_token ||
+          result.order.customer_order_token,
       });
 
       setData(previous => ({
         ...previous,
         orders: [
           savedOrder,
-          ...previous.orders.filter(order => order.id !== savedOrder.id),
+          ...previous.orders.filter(
+            order => order.id !== savedOrder.id,
+          ),
         ],
       }));
 
       setCart({});
       setScreen('success');
+
       Alert.alert(t('orderSuccessTitle'), t('orderServerSuccess'));
     } catch (error) {
       Alert.alert(t('orderFailed'), error.message);
@@ -723,9 +1076,11 @@ export default function App() {
         const updated = normalizeOrder({
           ...result.order,
           customer_order_token:
-            result.order.customer_order_token || order.customerOrderToken,
-       history: result.history || [],
-        }) 
+            result.order.customer_order_token ||
+            order.customerOrderToken,
+          history: result.history || [],
+        });
+
         setData(previous => ({
           ...previous,
           orders: previous.orders.map(item =>
@@ -739,45 +1094,65 @@ export default function App() {
   }
 
   function cancelCustomerOrder(order) {
-    if (['Delivered', 'Cancelled'].includes(order.status) || !order.customerOrderToken) {
+    if (
+      ['Delivered', 'Cancelled'].includes(order.status) ||
+      !order.customerOrderToken
+    ) {
       Alert.alert(t('cannotCancel'));
       return;
     }
+
     setCancellationOrder(order);
     setCancellationReason('');
   }
 
   async function submitCancellation() {
     const reason = cancellationReason.trim();
+
     if (!reason) {
       Alert.alert(t('reasonRequired'));
       return;
     }
+
     if (!cancellationOrder?.customerOrderToken) {
       Alert.alert(t('cannotCancel'));
       return;
     }
+
     setLoading(true);
+
     try {
       const result = await apiRequest(
         `/api/orders/${encodeURIComponent(cancellationOrder.id)}/cancel`,
-        {method: 'PATCH', body: JSON.stringify({reason})},
+        {
+          method: 'PATCH',
+          body: JSON.stringify({reason}),
+        },
         cancellationOrder.customerOrderToken,
       );
+
       if (result.success) {
         const updatedOrder = normalizeOrder({
           ...(result.order || cancellationOrder),
           status: result.order?.status || 'Cancelled',
-          cancellation_reason: result.order?.cancellation_reason || result.order?.cancellationReason || reason,
+          cancellation_reason:
+            result.order?.cancellation_reason ||
+            result.order?.cancellationReason ||
+            reason,
         });
+
         setData(previous => ({
           ...previous,
           orders: previous.orders.map(item =>
-            item.id === cancellationOrder.id ? {...item, ...updatedOrder} : item,
+            item.id === cancellationOrder.id
+              ? {...item, ...updatedOrder}
+              : item,
           ),
         }));
+
         setCancellationOrder(null);
         setCancellationReason('');
+
         Alert.alert(t('success'), t('orderCancelled'));
       } else {
         Alert.alert(t('cannotCancel'));
@@ -796,6 +1171,7 @@ export default function App() {
     }
 
     setLoading(true);
+
     try {
       const result = await apiRequest('/api/admin/login', {
         method: 'POST',
@@ -811,8 +1187,12 @@ export default function App() {
 
       setAdminToken(result.token);
       setAdminPassword('');
+
       await loadAdminOrders(result.token);
+      await loadAdminOffers(result.token);
+
       setScreen('admin');
+
       Alert.alert(t('success'), t('adminLoginSuccess'));
     } catch (error) {
       Alert.alert(t('adminError'), error.message);
@@ -826,15 +1206,20 @@ export default function App() {
 
     try {
       const result = await apiRequest('/api/admin/orders', {}, token);
+
       if (result.success && Array.isArray(result.orders)) {
         setData(previous => {
           const localById = new Map(
-            previous.orders.map(order => [String(order.id), order]),
+            previous.orders.map(order => [
+              String(order.id),
+              order,
+            ]),
           );
 
           const remoteOrders = result.orders.map(rawOrder => {
             const remote = normalizeOrder(rawOrder);
             const local = localById.get(String(remote.id));
+
             return {
               ...local,
               ...remote,
@@ -848,6 +1233,7 @@ export default function App() {
           const remoteIds = new Set(
             remoteOrders.map(order => String(order.id)),
           );
+
           const localOnlyOrders = previous.orders.filter(
             order => !remoteIds.has(String(order.id)),
           );
@@ -865,6 +1251,7 @@ export default function App() {
 
   async function updateOrderStatus(orderId, status) {
     if (loading) return;
+
     setLoading(true);
 
     try {
@@ -886,6 +1273,7 @@ export default function App() {
               : order,
           ),
         }));
+
         Alert.alert(t('success'), t('orderUpdated'));
       }
     } catch (error) {
@@ -918,22 +1306,32 @@ export default function App() {
       });
 
       if (picked.canceled || !picked.assets?.length) return null;
+
       return picked.assets[0];
     } catch (error) {
-      Alert.alert(t('productImage'), error.message || t('uploadFailed'));
+      Alert.alert(
+        t('productImage'),
+        error.message || t('uploadFailed'),
+      );
       return null;
     }
   }
 
   async function selectNewProductImage() {
     const photo = await chooseProductImage();
-    if (photo) setNewImage(photo);
+
+    if (photo) {
+      setNewImage(photo);
+    }
   }
 
   async function uploadProductImage(photo) {
-    if (!photo?.uri) throw new Error(t('uploadFailed'));
+    if (!photo?.uri) {
+      throw new Error(t('uploadFailed'));
+    }
 
     const form = new FormData();
+
     form.append('file', {
       uri: photo.uri,
       name: photo.fileName || `product-${Date.now()}.jpg`,
@@ -944,18 +1342,25 @@ export default function App() {
       `${API_BASE_URL}/api/admin/products/upload-image`,
       {
         method: 'POST',
-        headers: {Authorization: `Bearer ${adminToken}`},
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
         body: form,
       },
     );
 
     const result = await response.json().catch(() => ({}));
+
     if (!response.ok || !result.success) {
       throw new Error(result.message || result.error || t('uploadFailed'));
     }
 
     const imageUrl = result.image_url || result.url;
-    if (!imageUrl) throw new Error(t('uploadFailed'));
+
+    if (!imageUrl) {
+      throw new Error(t('uploadFailed'));
+    }
+
     return imageUrl;
   }
 
@@ -979,8 +1384,12 @@ export default function App() {
     }
 
     setLoading(true);
+
     try {
-      const imageUrl = newImage ? await uploadProductImage(newImage) : null;
+      const imageUrl = newImage
+        ? await uploadProductImage(newImage)
+        : null;
+
       const result = await apiRequest(
         '/api/admin/products',
         {
@@ -1001,13 +1410,17 @@ export default function App() {
 
       setData(previous => ({
         ...previous,
-        products: [...previous.products, normalizeProduct(result.product)],
+        products: [
+          ...previous.products,
+          normalizeProduct(result.product),
+        ],
       }));
 
       setNewName('');
       setNewPrice('');
       setNewStock('');
       setNewImage(null);
+
       Alert.alert(t('success'), t('productAdded'));
     } catch (error) {
       Alert.alert(t('productAddFailed'), error.message);
@@ -1018,12 +1431,16 @@ export default function App() {
 
   async function replaceProductImage(product) {
     if (loading || uploadingPhotoId) return;
+
     const photo = await chooseProductImage();
+
     if (!photo) return;
 
     setUploadingPhotoId(product.id);
+
     try {
       const imageUrl = await uploadProductImage(photo);
+
       const result = await apiRequest(
         `/api/admin/products/${encodeURIComponent(product.id)}`,
         {
@@ -1040,9 +1457,12 @@ export default function App() {
       setData(previous => ({
         ...previous,
         products: previous.products.map(item =>
-          item.id === product.id ? {...item, image_url: imageUrl} : item,
+          item.id === product.id
+            ? {...item, image_url: imageUrl}
+            : item,
         ),
       }));
+
       Alert.alert(t('success'), t('photoUploaded'));
     } catch (error) {
       Alert.alert(t('uploadFailed'), error.message);
@@ -1064,12 +1484,14 @@ export default function App() {
       Alert.alert(t('wrongInfo'), t('changesFailed'));
       return;
     }
+
     if (!stockText || !Number.isInteger(stock) || stock < 0) {
       Alert.alert(t('wrongInfo'), t('changesFailed'));
       return;
     }
 
     setLoading(true);
+
     try {
       const result = await apiRequest(
         `/api/admin/products/${encodeURIComponent(product.id)}`,
@@ -1087,7 +1509,9 @@ export default function App() {
       setData(previous => ({
         ...previous,
         products: previous.products.map(item =>
-          item.id === product.id ? {...item, price, stock} : item,
+          item.id === product.id
+            ? {...item, price, stock}
+            : item,
         ),
       }));
 
@@ -1099,7 +1523,10 @@ export default function App() {
 
       Alert.alert(t('success'), t('changesSaved'));
     } catch (error) {
-      Alert.alert(t('changesFailed'), error.message || t('changesFailed'));
+      Alert.alert(
+        t('changesFailed'),
+        error.message || t('changesFailed'),
+      );
     } finally {
       setLoading(false);
     }
@@ -1110,19 +1537,23 @@ export default function App() {
     setAdminId('');
     setAdminPassword('');
     setScreen('home');
+
     Alert.alert(t('success'), t('logoutSuccess'));
   }
 
   function openSupportEmail() {
     const url = `mailto:${SUPPORT_EMAIL}`;
+
     Linking.openURL(url).catch(() =>
       Alert.alert(t('emailSupport'), t('emailOpenError')),
     );
   }
 
   function openWhatsApp() {
-    Linking.openURL(`https://wa.me/${SUPPORT_PHONE.replace('+', '')}`).catch(
-      () => Alert.alert('Error', 'WhatsApp could not be opened'),
+    Linking.openURL(
+      `https://wa.me/${SUPPORT_PHONE.replace('+', '')}`,
+    ).catch(() =>
+      Alert.alert('Error', 'WhatsApp could not be opened'),
     );
   }
 
@@ -1130,9 +1561,7 @@ export default function App() {
     Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() =>
       Alert.alert('Error', 'Calling could not be started'),
     );
-  } 
-
-  return (
+  }   return (
     <SafeAreaView style={styles.safe}>
       {header}
 
@@ -1140,7 +1569,10 @@ export default function App() {
         {button(t('home'), () => setScreen('home'))}
         {button(t('myOrders'), () => setScreen('myorders'))}
         {button(t('settings'), () => setScreen('settings'))}
-
+        {button(
+          t('shopAdmin'),
+          () => setScreen(adminToken ? 'admin' : 'adminLogin'),
+        )}
       </View>
 
       {loading && (
@@ -1163,11 +1595,21 @@ export default function App() {
               style={styles.cancelReasonInput}
               placeholderTextColor="#8193a5"
             />
-            {button(t('submitCancellation'), submitCancellation, true, loading)}
-            {button(language === 'en' ? 'Back' : 'वापस', () => {
-              setCancellationOrder(null);
-              setCancellationReason('');
-            }, false, loading)}
+            {button(
+              t('submitCancellation'),
+              submitCancellation,
+              true,
+              loading,
+            )}
+            {button(
+              language === 'en' ? 'Back' : 'वापस',
+              () => {
+                setCancellationOrder(null);
+                setCancellationReason('');
+              },
+              false,
+              loading,
+            )}
           </View>
         </View>
       ) : null}
@@ -1182,6 +1624,30 @@ export default function App() {
           ) : null}
 
           {field(search, setSearch, t('search'))}
+
+          {offers
+            .filter(offer => offer.is_active === true)
+            .map(offer => (
+              <View style={styles.card} key={`customer-offer-${offer.id}`}>
+                <Text style={styles.title}>
+                  {offer.title}
+                </Text>
+
+                {offer.image_url ? (
+                  <Image
+                    source={{uri: offer.image_url}}
+                    style={styles.offerImage}
+                    resizeMode="cover"
+                  />
+                ) : null}
+
+                {offer.description ? (
+                  <Text style={styles.muted}>
+                    {offer.description}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
 
           <View style={styles.productGrid}>
             {items.map(product => (
@@ -1226,9 +1692,75 @@ export default function App() {
           )}
 
           <Text style={styles.title}>{t('deliveryInfo')}</Text>
+
           {field(name, setName, t('customerName'))}
-          {field(phone, setPhone, t('mobile'), 'phone-pad')}
+
+          {field(
+            phone,
+            value => {
+              setPhone(value.replace(/\D/g, '').slice(0, 10));
+
+              if (value.trim() !== verifiedPhone) {
+                setVerifiedPhone('');
+                setCustomerToken('');
+                setOtpSent(false);
+              }
+            },
+            t('mobile'),
+            'phone-pad',
+          )}
+
+          {verifiedPhone === phone.trim() && customerToken ? (
+            <Text style={styles.verifiedText}>
+              ✓ {t('otpVerified')}
+            </Text>
+          ) : (
+            <>
+              {button(
+                t('sendOtp'),
+                sendCustomerOtp,
+                true,
+                loading,
+              )}
+
+              {otpSent ? (
+                <>
+                  <TextInput
+                    value={customerOtp}
+                    onChangeText={value =>
+                      setCustomerOtp(
+                        value.replace(/\D/g, '').slice(0, 10),
+                      )
+                    }
+                    placeholder={t('enterOtp')}
+                    keyboardType="number-pad"
+                    maxLength={10}
+                    style={styles.input}
+                  />
+
+                  {button(
+                    t('verifyOtp'),
+                    verifyCustomerOtp,
+                    true,
+                    loading,
+                  )}
+                </>
+              ) : null}
+            </>
+          )}
+
           {field(address, setAddress, t('fullAddress'))}
+
+          <TextInput
+            value={pinCode}
+            onChangeText={value =>
+              setPinCode(value.replace(/\D/g, '').slice(0, 6))
+            }
+            placeholder={t('pinCode')}
+            keyboardType="number-pad"
+            maxLength={6}
+            style={styles.input}
+          />
 
           <View style={styles.total}>
             <Text style={styles.item}>
@@ -1268,9 +1800,14 @@ export default function App() {
               <Text style={styles.statusText}>
                 {t('status')}: {statusLabel(order.status)}
               </Text>
+
               {order.cancellationReason ? (
-                <Text>{t('cancellationReason')}: {order.cancellationReason}</Text>
-              ) : null}               <Text>
+                <Text>
+                  {t('cancellationReason')}: {order.cancellationReason}
+                </Text>
+              ) : null}
+
+              <Text>
                 {t('customer')}: {order.customer || '-'}
               </Text>
               <Text>
@@ -1303,6 +1840,7 @@ export default function App() {
                         ? 'Order progress'
                         : 'ऑर्डर की प्रगति'}
                     </Text>
+
                     {order.statusHistory.map((entry, index) => (
                       <Text key={`${order.id}-history-${index}`}>
                         • {statusLabel(entry.status || entry.new_status || '')}
@@ -1377,6 +1915,7 @@ export default function App() {
           {data.orders.map(order => (
             <View style={styles.card} key={`admin-${order.id}`}>
               <Text style={styles.item}>Order #{order.id}</Text>
+
               <Text>
                 {t('customer')}: {order.customer || '-'}
               </Text>
@@ -1386,22 +1925,34 @@ export default function App() {
               <Text>
                 {t('address')}: {order.address || '-'}
               </Text>
+
               <Text style={styles.editLabel}>{t('items')}:</Text>
               <Text>
                 {order.items
                   .map(item => `${item.name} × ${item.qty}`)
                   .join(', ')}
               </Text>
+
               <Text style={styles.item}>
                 {t('total')}: {money(order.total)}
               </Text>
               <Text>{t('payment')}: {order.payment || 'COD'}</Text>
+
               <Text style={styles.statusText}>
                 {t('status')}: {statusLabel(order.status)}
               </Text>
-              {order.cancellationReason ? (
-                <Text>{t('cancellationReason')}: {order.cancellationReason}</Text>
-              ) : null}
+
+              {order.status === 'Cancelled' &&
+                order.cancellationReason &&
+                button(
+                  t('reasonView'),
+                  () =>
+                    Alert.alert(
+                      t('cancellationReason'),
+                      order.cancellationReason,
+                    ),
+                )}
+
               <Text style={styles.muted}>{order.createdAt || ''}</Text>
 
               <View style={styles.actionRow}>
@@ -1448,6 +1999,92 @@ export default function App() {
           {data.orders.length === 0 && (
             <Text style={styles.muted}>{t('noOrders')}</Text>
           )}
+
+          <Text style={styles.title}>{t('offers')}</Text>
+
+          <Text style={styles.editLabel}>
+            {editingOfferId ? t('editOffer') : t('addOffer')}
+          </Text>
+
+          {field(newOfferTitle, setNewOfferTitle, t('offerTitle'))}
+
+          <TextInput
+            value={newOfferDescription}
+            onChangeText={setNewOfferDescription}
+            placeholder={t('offerDescription')}
+            multiline
+            textAlignVertical="top"
+            style={styles.input}
+          />
+
+          {newOfferImage?.uri ? (
+            <Image
+              source={{uri: newOfferImage.uri}}
+              style={styles.imagePreview}
+              resizeMode="cover"
+            />
+          ) : null}
+
+          {button(t('chooseOfferImage'), chooseOfferPhoto)}
+
+          {button(
+            editingOfferId ? t('saveOffer') : t('addOffer'),
+            saveOffer,
+            true,
+            loading,
+          )}
+
+          {editingOfferId
+            ? button(
+                language === 'en' ? 'Cancel edit' : 'एडिट रद्द करें',
+                () => {
+                  setEditingOfferId('');
+                  setNewOfferTitle('');
+                  setNewOfferDescription('');
+                  setNewOfferImage(null);
+                },
+              )
+            : null}
+
+          {offers.map(offer => (
+            <View style={styles.card} key={`admin-offer-${offer.id}`}>
+              <Text style={styles.item}>{offer.title}</Text>
+
+              {offer.image_url ? (
+                <Image
+                  source={{uri: offer.image_url}}
+                  style={styles.offerImage}
+                  resizeMode="cover"
+                />
+              ) : null}
+
+              {offer.description ? (
+                <Text style={styles.muted}>
+                  {offer.description}
+                </Text>
+              ) : null}
+
+              <Text style={styles.statusText}>
+                {offer.is_active
+                  ? (language === 'en' ? 'Active' : 'चालू')
+                  : (language === 'en' ? 'Inactive' : 'बंद')}
+              </Text>
+
+              <View style={styles.actionRow}>
+                {button(
+                  t('editOffer'),
+                  () => startEditOffer(offer),
+                )}
+
+                {button(
+                  offer.is_active
+                    ? t('deactivateOffer')
+                    : t('activateOffer'),
+                  () => toggleOffer(offer),
+                )}
+              </View>
+            </View>
+          ))}
 
           <Text style={styles.title}>{t('productManagement')}</Text>
           <Text style={styles.editLabel}>{t('addProductTitle')}</Text>
@@ -1553,6 +2190,7 @@ export default function App() {
       {screen === 'settings' && (
         <ScrollView style={styles.body}>
           <Text style={styles.title}>{t('settings')}</Text>
+
           <Text style={styles.item}>
             {t('language')} / Language
           </Text>
@@ -1754,6 +2392,18 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     backgroundColor: '#edf3f8',
   },
+  offerImage: {
+    width: '100%',
+    height: 145,
+    borderRadius: 9,
+    marginVertical: 6,
+    backgroundColor: '#edf3f8',
+  },
+  verifiedText: {
+    color: '#16803c',
+    fontWeight: 'bold',
+    marginVertical: 6,
+  },
   productAdminRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1831,15 +2481,31 @@ const styles = StyleSheet.create({
     marginVertical: 5,
   },
   cancelOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center',
-    padding: 20, zIndex: 20, elevation: 20,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    padding: 20,
+    zIndex: 20,
+    elevation: 20,
   },
-  cancelDialog: {backgroundColor: '#fff', borderRadius: 12, padding: 16},
+  cancelDialog: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+  },
   cancelReasonInput: {
-    minHeight: 110, borderWidth: 1, borderColor: '#cbd8e5',
-    borderRadius: 8, padding: 10, marginVertical: 12,
-    color: '#20384f', backgroundColor: '#fff',
+    minHeight: 110,
+    borderWidth: 1,
+    borderColor: '#cbd8e5',
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 12,
+    color: '#20384f',
+    backgroundColor: '#fff',
   },
   historyBox: {
     backgroundColor: '#f3f7fc',
