@@ -1569,10 +1569,7 @@ export default function App() {
         {button(t('home'), () => setScreen('home'))}
         {button(t('myOrders'), () => setScreen('myorders'))}
         {button(t('settings'), () => setScreen('settings'))}
-        {button(
-          t('shopAdmin'),
-          () => setScreen(adminToken ? 'admin' : 'adminLogin'),
-        )}
+
       </View>
 
       {loading && (
