@@ -390,7 +390,7 @@ export default function App() {
     },
   });
 
-  const [screen, setScreen] = useState('home');
+  const [screen, setScreen] = useState('login');
   const [language, setLanguage] = useState('hi');
   const t = key =>
     translations[language]?.[key] || translations.hi[key] || key;
