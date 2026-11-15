@@ -1565,14 +1565,14 @@ setScreen('home');
         {button(t('home'), () => setScreen('home'))}
         {button(t('myOrders'), () => setScreen('myorders'))}
         {button(t('settings'), () => setScreen('settings'))}
-
-      </View>
-
-      {loading && (
-        <View style={styles.loading}>
-          <ActivityIndicator size="small" color="#1769aa" />
-          <Text style={styles.muted}>{t('wait')}</Text>
-        </View>
+{screen !== 'login' && (
+  <View style={styles.nav}>
+    {button(t('home'), () => setScreen('home'))}
+    {button(t('myOrders'), () => setScreen('myorders'))}
+    {button(t('settings'), () => setScreen('settings'))}
+  </View>
+)}
+      
       )}
 
       {cancellationOrder ? (
