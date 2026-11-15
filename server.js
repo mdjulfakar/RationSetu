@@ -374,7 +374,6 @@ app.get("/api/products", async (req, res) => {
       return res.status(400).json({
         success: false,
         code: "PIN_CODE_REQUIRED",
-        message: "कृपया 6 अंकों का PIN Code भेजें।"
       });
     }
 
