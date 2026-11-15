@@ -1606,7 +1606,50 @@ setScreen('home');
           </View>
         </View>
       ) : null}
+{screen === 'login' && (
+  <View style={styles.body}>
+    <Text style={styles.title}>RationSetu</Text>
+    <Text style={styles.muted}>
+      {language === 'en'
+        ? 'Login with mobile number'
+        : 'मोबाइल नंबर से लॉगिन करें'}
+    </Text>
 
+    <Text style={styles.muted}>🇮🇳 +91</Text>
+
+    {field(
+      phone,
+      value => setPhone(value.replace(/\D/g, '').slice(0, 10)),
+      language === 'en' ? '10-digit mobile number' : '10 अंकों का मोबाइल नंबर',
+      'phone-pad',
+    )}
+
+    {button(
+      language === 'en' ? 'Send OTP' : 'OTP भेजें',
+      sendCustomerOtp,
+      true,
+      loading,
+    )}
+
+    {otpSent && (
+      <>
+        {field(
+          customerOtp,
+          value => setCustomerOtp(value.replace(/\D/g, '').slice(0, 6)),
+          language === 'en' ? 'Enter 6-digit OTP' : '6 अंकों का OTP डालें',
+          'number-pad',
+        )}
+
+        {button(
+          language === 'en' ? 'Verify OTP' : 'OTP सत्यापित करें',
+          verifyCustomerOtp,
+          true,
+          loading,
+        )}
+      </>
+    )}
+  </View>
+)}
       {screen === 'home' && (
         <ScrollView style={styles.body}>
           <Text style={styles.title}>{t('orderTitle')}</Text>
