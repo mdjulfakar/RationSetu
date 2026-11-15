@@ -965,11 +965,6 @@ export default function App() {
       return;
     }
 
-    if (!customerToken || verifiedPhone !== phone.trim()) {
-      Alert.alert(t('otpRequired'), t('otpRequired'));
-      return;
-    }
-
     const selectedItems = Object.entries(cart)
       .filter(
         ([id, quantity]) =>
