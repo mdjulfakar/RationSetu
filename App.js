@@ -442,7 +442,7 @@ export default function App() {
           setCustomerToken(savedToken);
           setVerifiedPhone(savedPhone);
           setPhone(savedPhone);
-        }
+        } setScreen('home');
       } catch (error) {
         console.log('Customer session restore error:', error);
       }
