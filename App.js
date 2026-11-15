@@ -1707,44 +1707,6 @@ export default function App() {
             'phone-pad',
           )}
 
-          {verifiedPhone === phone.trim() && customerToken ? (
-            <Text style={styles.verifiedText}>
-              ✓ {t('otpVerified')}
-            </Text>
-          ) : (
-            <>
-              {button(
-                t('sendOtp'),
-                sendCustomerOtp,
-                true,
-                loading,
-              )}
-
-              {otpSent ? (
-                <>
-                  <TextInput
-                    value={customerOtp}
-                    onChangeText={value =>
-                      setCustomerOtp(
-                        value.replace(/\D/g, '').slice(0, 10),
-                      )
-                    }
-                    placeholder={t('enterOtp')}
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    style={styles.input}
-                  />
-
-                  {button(
-                    t('verifyOtp'),
-                    verifyCustomerOtp,
-                    true,
-                    loading,
-                  )}
-                </>
-              ) : null}
-            </>
-          )}
 
           {field(address, setAddress, t('fullAddress'))}
 
