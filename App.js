@@ -1561,19 +1561,13 @@ setScreen('home');
     <SafeAreaView style={styles.safe}>
       {header}
 
-      <View style={styles.nav}>
-        {button(t('home'), () => setScreen('home'))}
-        {button(t('myOrders'), () => setScreen('myorders'))}
-        {button(t('settings'), () => setScreen('settings'))}
-{screen !== 'login' && (
+      {screen !== 'login' && (
   <View style={styles.nav}>
     {button(t('home'), () => setScreen('home'))}
     {button(t('myOrders'), () => setScreen('myorders'))}
     {button(t('settings'), () => setScreen('settings'))}
   </View>
 )}
-      
-      )}
 
       {cancellationOrder ? (
         <View style={styles.cancelOverlay}>
