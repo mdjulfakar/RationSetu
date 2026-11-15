@@ -748,7 +748,7 @@ export default function App() {
         'rationsetu_verified_phone',
         mobile,
       );
-
+setScreen('home');
       Alert.alert(t('success'), result.message || t('otpVerified'));
     } catch (error) {
       Alert.alert(t('wrongInfo'), error.message);
