@@ -23,8 +23,8 @@ const LANGUAGE_KEY = 'rationsetu_language';
 const PRESENCE_CLIENT_KEY = 'rationsetu_presence_client_id';
 const HEARTBEAT_INTERVAL = 30000;
 
-const SUPPORT_PHONE = '+919086305021';
-const SUPPORT_EMAIL = 'zulfakar281@gmail.com';
+const SUPPORT_PHONE = '+917006571501';
+const SUPPORT_EMAIL = 'rationsetuofficial@gmail.com';
 
 const initialProducts = [
   {id: 'p1', name: 'चावल', unit: 'किलो', price: 38, stock: 500},
