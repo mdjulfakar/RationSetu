@@ -35,12 +35,8 @@ button.gray{background:#667085}
 .product-actions,.offer-actions{display:flex;gap:7px;flex-wrap:wrap}
 .product-actions button,.offer-actions button{width:auto;min-width:100px;margin:5px 0 0}
 .preview{max-width:140px;max-height:140px;object-fit:cover;border-radius:9px;margin-top:8px}
-.map-link{ .map-link{display:inline-block;margin:8px 0;padding:10px 14px;background:#e9efff;color:#1649a5;border-radius:9px;font-weight:700;text-decoration:none}
-
-.whatsapp-link{background:#e8f7ed;color:#167a3a}
-
-.reason{background:#fff8e6;border:1px solid #f4d58d;border-radius:9px;padding:12px;margin-top:10px;white-space:pre-wrap;overflow-wrap:anywhere}
-  display:inline-block;margin:8px 0;padding:10px 14px;background:#e9efff;color:#1649a5;border-radius:9px;font-weight:700;text-decoration:none}
+.map-link{display:inline-block;margin:8px 0;padding:10px 14px;background:#e9efff;color:#1649a5;border-radius:9px;font-weight:700;text-decoration:none}
+.whatsapp-link{background:#e8f7ed;color:#137333}
 .reason{background:#fff8e6;border:1px solid #f4d58d;border-radius:9px;padding:12px;margin-top:10px;white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:520px){
 .product{align-items:flex-start}
@@ -494,9 +490,7 @@ window.toggleProduct=async(id,active)=>{
   }
 };
 
-$('refreshProducts').onclick=loadProducts;
-
-/* ORDER LOCATION AND CANCELLATION REASON */
+$('refreshProducts').onclick=loadProducts; /* ORDER LOCATION AND CANCELLATION REASON */
 
 function orderMapUrl(o){
   const lat=o.customer_lat;
@@ -514,6 +508,37 @@ function orderMapUrl(o){
         ?Number(lat)+','+Number(lng)
         :String(o.address||'').trim()
     );
+}
+
+function orderWhatsAppUrl(o){
+  const pin=o.pincode??o.pin_code??o.pin??o.postal_code??'';
+
+  const items=Array.isArray(o.items)&&o.items.length
+    ?o.items.map((item,index)=>{
+      if(typeof item==='string')return (index+1)+'. '+item;
+      const name=item.name||item.product_name||item.title||'सामान';
+      const qty=item.quantity??item.qty??1;
+      const price=item.price??item.total_price??'';
+      return (index+1)+'. '+name+' × '+qty+
+        (price!==''?' (₹'+price+')':'');
+    }).join('\n')
+    :'ऑर्डर आइटम की जानकारी उपलब्ध नहीं है';
+
+  const message=[
+    '🛒 RationSetu — डिलीवरी ऑर्डर',
+    'ऑर्डर ID: '+(o.id??'—'),
+    'ग्राहक: '+(o.customer_name||'—'),
+    'मोबाइल: '+(o.mobile||'—'),
+    'पूरा पता: '+(o.address||'—'),
+    'PIN Code: '+(pin||'—'),
+    'Google Maps लोकेशन: '+orderMapUrl(o),
+    'सामान:',
+    items,
+    'कुल राशि: ₹'+(o.total_amount??'—'),
+    'ऑर्डर स्थिति: '+(o.status||'—')
+  ].join('\n');
+
+  return 'https://wa.me/?text='+encodeURIComponent(message);
 }
 
 $('refresh').onclick=loadOrders;
@@ -541,12 +566,13 @@ async function loadOrders(){
              target="_blank"
              rel="noopener noreferrer">
              📍 GPS लोकेशन देखें / Google Maps
-          </a><a class="map-link whatsapp-link"
-   href="${esc(orderWhatsAppUrl(o))}"
-   target="_blank"
-   rel="noopener noreferrer">
-   🟢 WhatsApp पर डिलीवरी बॉय को भेजें
-</a>
+          </a>
+          <a class="map-link whatsapp-link"
+             href="${esc(orderWhatsAppUrl(o))}"
+             target="_blank"
+             rel="noopener noreferrer">
+             🟢 WhatsApp पर डिलीवरी बॉय को भेजें
+          </a>
 
           <p>आइटम: ${esc(JSON.stringify(o.items||[]))}</p>
           <p>स्थिति: <span class="status">${esc(o.status)}</span></p>
