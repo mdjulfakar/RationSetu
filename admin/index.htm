@@ -536,7 +536,12 @@ async function loadOrders(){
              target="_blank"
              rel="noopener noreferrer">
              📍 GPS लोकेशन देखें / Google Maps
-          </a>
+          </a><a class="map-link whatsapp-link"
+   href="${esc(orderWhatsAppUrl(o))}"
+   target="_blank"
+   rel="noopener noreferrer">
+   🟢 WhatsApp पर डिलीवरी बॉय को भेजें
+</a>
 
           <p>आइटम: ${esc(JSON.stringify(o.items||[]))}</p>
           <p>स्थिति: <span class="status">${esc(o.status)}</span></p>
