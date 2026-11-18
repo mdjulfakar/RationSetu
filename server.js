@@ -544,19 +544,24 @@ app.post("/api/orders", async (req, res) => {
     const finalTotal =
       subtotal + deliveryCharge + weightSurcharge + platformFee;
 
-    const order = {
-      customer_name: String(customer_name).trim(),
-      mobile: verifiedPhone,       address: String(address).trim(),
-      pin_code: String(pin_code).trim(),
-      items,
-      total_amount: finalTotal,
-      item_subtotal: subtotal,
-      customer_lat: Number(customer_lat),
-      customer_lng: Number(customer_lng),
-      delivery_distance_km: Number(distanceKm.toFixed(2)),
-      payment_method: "COD",
-      status: "Pending"
-    };
+const order = {
+  customer_name: String(customer_name).trim(),
+  mobile: verifiedPhone,
+  address: String(address).trim(),
+  pin_code: String(pin_code).trim(),
+  items,
+  total_amount: finalTotal,
+  item_subtotal: subtotal,
+  delivery_charge: deliveryCharge,
+  weight_surcharge: weightSurcharge,
+  app_fee: platformFee,
+  total_weight_kg: Number(totalWeightKg.toFixed(2)),
+  customer_lat: Number(customer_lat),
+  customer_lng: Number(customer_lng),
+  delivery_distance_km: Number(distanceKm.toFixed(2)),
+  payment_method: "COD",
+  status: "Pending"
+};
 
     const { data, error } = await supabase
       .from("orders")
