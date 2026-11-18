@@ -1972,7 +1972,7 @@ async function refreshCustomerOrder(order) {
           )}
 
           <Text style={styles.title}>{t('adminOrders')}</Text>
-
+                                        
           {data.orders.map(order => (
             <View style={styles.card} key={`admin-${order.id}`}>
               <Text style={styles.item}>Order #{order.id}</Text>
@@ -1986,8 +1986,9 @@ async function refreshCustomerOrder(order) {
               <Text>
                 {t('address')}: {order.address || '-'}
               </Text>
-        {renderBillingBreakdown(order)}
-<Text>{t('payment')}: {order.payment || 'COD'}</Text>
+
+              {renderBillingBreakdown(order)}
+              <Text>{t('payment')}: {order.payment || 'COD'}</Text>
 
               <Text style={styles.statusText}>
                 {t('status')}: {statusLabel(order.status)}
@@ -1996,35 +1997,35 @@ async function refreshCustomerOrder(order) {
               {order.status === 'Cancelled' &&
                 order.cancellationReason &&
                 button(
-                  t('reasonView'                      t('रद्दीकरणकारण'),                  () =>
+                  t('reasonView'),
                   () =>
                     Alert.alert(
-                      t('cancellationReason'              <Text style={styles.muted}>{order.createdAt || ''}</Text>                      आदेश रद्द करने का कारण,
+                      t('cancellationReason'),
                       order.cancellationReason,
                     ),
                 )}
 
               <Text style={styles.muted}>{order.createdAt || ''}</Text>
 
-                  टी('स्वीकार करें'),              <View style={styles.actionRow}>style={styles.actionRow}>
+              <View style={styles.actionRow}>
                 {button(
-                  t('accept'                  () => अपडेटऑर्डरस्टेटस(ऑर्डर.आईडी, 'स्वीकृत'),,
-                  () => updateOrderStatus(order.id, 'Accepted'                  टी('तैयारी कर रहा है'),                  असत्य,
+                  t('accept'),
+                  () => updateOrderStatus(order.id, 'Accepted'),
                   false,
                   loading,
                 )}
                 {button(
-                  t('preparing'                  () => अपडेटऑर्डरस्टेटस(ऑर्डर.आईडी, 'तैयारी हो रही है'),,
-                  () => updateOrderStatus(order.id, 'Preparing'              </View>                  असत्य,
+                  t('preparing'),
+                  () => updateOrderStatus(order.id, 'Preparing'),
                   false,
                   loading,
                 )}
               </View>
 
-                  टी('आउटफॉरडिलीवरी'),              <View style={styles.actionRow}>style={styles.actionRow}>
+              <View style={styles.actionRow}>
                 {button(
-                  t('outForDelivery'                  () => अपडेटऑर्डरस्टेटस(ऑर्डर.आईडी, 'डिलीवरी के लिए निकला'),,
-                  () => updateOrderStatus(order.id, 'Out for Delivery'                  लोड हो रहा है,                  असत्य,
+                  t('outForDelivery'),
+                  () => updateOrderStatus(order.id, 'Out for Delivery'),
                   false,
                   loading,
                 )}
@@ -2046,8 +2047,7 @@ async function refreshCustomerOrder(order) {
                 )}
             </View>
           ))}
-
-          {data.orders.length === 0 && (
+  {data.orders.length === 0 && (
             <Text style={styles.muted}>{t('noOrders')}</Text>
           )}
 
