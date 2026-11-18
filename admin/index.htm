@@ -550,7 +550,27 @@ async function loadOrders(){
     const d=await api('/api/admin/orders',{headers:headers()});
     const a=d.orders||[];
 
-    $('summary').textContent='कुल ऑर्डर: '+a.length;
+    $( const today = new Date().toDateString();
+
+const todayOrders = a.filter(o =>
+  o.created_at &&
+  new Date(o.created_at).toDateString() === today
+).length;
+
+const pendingOrders = a.filter(o =>
+  String(o.status).toLowerCase() === 'pending'
+).length;
+
+const deliveredOrders = a.filter(o =>
+  String(o.status).toLowerCase() === 'delivered'
+).length;
+
+$('summary').innerHTML = `
+  <b>कुल ऑर्डर: ${a.length}</b><br>
+  आज के ऑर्डर: ${todayOrders}<br>
+  Pending ऑर्डर: ${pendingOrders}<br>
+  Delivered ऑर्डर: ${deliveredOrders}
+`;
 
     $('orders').innerHTML=a.length?a.map(o=>{
       const cancelled=String(o.status||'').toLowerCase()==='cancelled';
