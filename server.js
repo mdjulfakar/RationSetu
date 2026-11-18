@@ -367,33 +367,8 @@ app.get("/", (req, res) => {
 // ================= CUSTOMER: PRODUCTS =================
 
 app.get("/api/products", async (req, res) => {
-  try {
-    const pinCode = String(req.query.pin_code || "").trim();
-
-    if (!/^\d{6}$/.test(pinCode)) {
-      return res.status(400).json({
-        success: false,
-        code: "PIN_CODE_REQUIRED",
-      });
-    }
-
-    if (getServiceablePinCodes().length === 0) {
-      return res.status(503).json({
-        success: false,
-        code: "PIN_CODES_NOT_CONFIGURED",
-        message: "दुकान के serviceable PIN Codes server पर सेट नहीं हैं।"
-      });
-    }
-
-    if (!isServiceablePinCode(pinCode)) {
-      return res.status(403).json({
-        success: false,
-        code: "PIN_CODE_NOT_SERVICEABLE",
-        message: "इस PIN Code पर अभी डिलीवरी उपलब्ध नहीं है।",
-        pin_code: pinCode
-      });
-    }
-
+  try { 
+  }
     const { data, error } = await supabase
       .from("products")
       .select("*")
