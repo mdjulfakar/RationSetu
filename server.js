@@ -1,4 +1,3 @@
-
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -88,25 +87,6 @@ function verifyCustomerLoginToken(token) {
   return safeTokenEqual(suppliedSignature, expectedSignature)
     ? phone
     : null;
-}
-
-// ================= CUSTOMER PIN CODE AVAILABILITY =================
-
-// Configure comma-separated 6-digit serviceable PIN codes in
-// SERVICEABLE_PIN_CODES on the server hosting environment.
-function getServiceablePinCodes() {
-  return String(process.env.SERVICEABLE_PIN_CODES || "")
-    .split(",")
-    .map(pin => pin.trim())
-    .filter(pin => /^\d{6}$/.test(pin));
-}
-
-function isServiceablePinCode(pinCode) {
-  const pin = String(pinCode || "").trim();
-  const serviceablePins = getServiceablePinCodes();
-  return /^\d{6}$/.test(pin) &&
-    serviceablePins.length > 0 &&
-    serviceablePins.includes(pin);
 }
 
 // ================= CUSTOMER ORDER SECURITY =================
@@ -455,14 +435,6 @@ app.post("/api/orders", async (req, res) => {
       });
     }
 
-    if (!isServiceablePinCode(pin_code)) {
-      return res.status(403).json({
-        success: false,
-        code: "PIN_CODE_NOT_SERVICEABLE",
-        message: "इस PIN Code पर अभी डिलीवरी उपलब्ध नहीं है।"
-      });
-    }
-
     if (
       !String(customer_name || "").trim() ||
       !String(address || "").trim() ||
@@ -574,8 +546,7 @@ app.post("/api/orders", async (req, res) => {
 
     const order = {
       customer_name: String(customer_name).trim(),
-      mobile: verifiedPhone,
-      address: String(address).trim(),
+      mobile: verifiedPhone,       address: String(address).trim(),
       pin_code: String(pin_code).trim(),
       items,
       total_amount: finalTotal,
@@ -1126,7 +1097,7 @@ app.post("/api/admin/products", requireAdmin, async (req, res) => {
 
 // ================= ADMIN: UPDATE PRODUCT =================
 
-app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
+   app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
   try {
     const allowedFields = [
       "name",
@@ -1686,5 +1657,4 @@ app.post("/api/presence/heartbeat", (req, res) => {
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
-});
-
+});   
