@@ -959,12 +959,7 @@ setScreen('home');
     if (!address.trim()) {
       Alert.alert(t('addressIncomplete'), t('fillAddress'));
       return;
-    }
-
-    if (!/^\d{6}$/.test(pinCode.trim())) {
-      Alert.alert(t('addressIncomplete'), t('pinRequired'));
-      return;
-    }
+    } 
 
     const selectedItems = Object.entries(cart)
       .filter(
