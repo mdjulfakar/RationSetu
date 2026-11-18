@@ -1986,18 +1986,8 @@ async function refreshCustomerOrder(order) {
               <Text>
                 {t('address')}: {order.address || '-'}
               </Text>
-
-              <Text style={styles.editLabel}>{t('items')}:</Text>
-              <Text>
-                {order.items
-                  .map(item => `${item.name} × ${item.qty}`)
-                  .join(', ')}
-              </Text>
-
-              <Text style={styles.item}>
-                {t('total')}: {money(order.total)}
-              </Text>
-              <Text>{t('payment')}: {order.payment || 'COD'}</Text>
+        {renderBillingBreakdown(order)}
+<Text>{t('payment')}: {order.payment || 'COD'}</Text>
 
               <Text style={styles.statusText}>
                 {t('status')}: {statusLabel(order.status)}
@@ -2006,35 +1996,35 @@ async function refreshCustomerOrder(order) {
               {order.status === 'Cancelled' &&
                 order.cancellationReason &&
                 button(
-                  t('reasonView'),
+                  t('reasonView'                      t('रद्दीकरणकारण'),                  () =>
                   () =>
                     Alert.alert(
-                      t('cancellationReason'),
+                      t('cancellationReason'              <Text style={styles.muted}>{order.createdAt || ''}</Text>                      आदेश रद्द करने का कारण,
                       order.cancellationReason,
                     ),
                 )}
 
               <Text style={styles.muted}>{order.createdAt || ''}</Text>
 
-              <View style={styles.actionRow}>
+                  टी('स्वीकार करें'),              <View style={styles.actionRow}>style={styles.actionRow}>
                 {button(
-                  t('accept'),
-                  () => updateOrderStatus(order.id, 'Accepted'),
+                  t('accept'                  () => अपडेटऑर्डरस्टेटस(ऑर्डर.आईडी, 'स्वीकृत'),,
+                  () => updateOrderStatus(order.id, 'Accepted'                  टी('तैयारी कर रहा है'),                  असत्य,
                   false,
                   loading,
                 )}
                 {button(
-                  t('preparing'),
-                  () => updateOrderStatus(order.id, 'Preparing'),
+                  t('preparing'                  () => अपडेटऑर्डरस्टेटस(ऑर्डर.आईडी, 'तैयारी हो रही है'),,
+                  () => updateOrderStatus(order.id, 'Preparing'              </View>                  असत्य,
                   false,
                   loading,
                 )}
               </View>
 
-              <View style={styles.actionRow}>
+                  टी('आउटफॉरडिलीवरी'),              <View style={styles.actionRow}>style={styles.actionRow}>
                 {button(
-                  t('outForDelivery'),
-                  () => updateOrderStatus(order.id, 'Out for Delivery'),
+                  t('outForDelivery'                  () => अपडेटऑर्डरस्टेटस(ऑर्डर.आईडी, 'डिलीवरी के लिए निकला'),,
+                  () => updateOrderStatus(order.id, 'Out for Delivery'                  लोड हो रहा है,                  असत्य,
                   false,
                   loading,
                 )}
