@@ -364,6 +364,12 @@ function normalizeOrder(order) {
     phone: order.mobile || order.phone || '',
     address: order.address || '',
     total: Number(order.total_amount ?? order.total ?? 0),
+    itemSubtotal: order.item_subtotal ?? null,
+    deliveryCharge: order.delivery_charge ?? null,
+    weightSurcharge: order.weight_surcharge ?? null,
+    appFee: order.app_fee ?? null,
+    totalWeightKg: order.total_weight_kg ?? null,
+
     status: order.status || 'Pending',
     cancellationReason: order.cancellation_reason || order.cancellationReason || order.cancel_reason || '',
     payment: order.payment_method || order.payment || 'COD',
@@ -1043,9 +1049,87 @@ setScreen('home');
     } finally {
       setLoading(false);
     }
+  } 
+function renderBillingBreakdown(order) {
+    const items = Array.isArray(order.items) ? order.items : [];
+
+    const savedItemSubtotal =
+      order.itemSubtotal !== null &&
+      order.itemSubtotal !== undefined
+        ? Number(order.itemSubtotal)
+        : items.reduce(
+            (sum, item) =>
+              sum +
+              Number(item.price || 0) * Number(item.qty || 0),
+            0,
+          );
+
+    const hasSavedCharges =
+      order.deliveryCharge !== null &&
+      order.deliveryCharge !== undefined &&
+      order.weightSurcharge !== null &&
+      order.weightSurcharge !== undefined &&
+      order.appFee !== null &&
+      order.appFee !== undefined;
+
+    return (
+      <View style={styles.historyBox}>
+        <Text style={styles.editLabel}>
+          {language === 'en' ? 'Bill Breakdown' : 'बिल का पूरा हिसाब'}
+        </Text>
+
+        {items.map((item, index) => (
+          <Text key={`${order.id}-bill-${index}`}>
+            {item.name}: {money(item.price)} × {item.qty} {item.unit || ''}
+            {' = '}
+            {money(Number(item.price || 0) * Number(item.qty || 0))}
+          </Text>
+        ))}
+
+        <Text>
+          {language === 'en' ? 'Items Subtotal' : 'सामान का कुल'}:
+          {' '}{money(savedItemSubtotal)}
+        </Text>
+
+        {hasSavedCharges ? (
+          <>
+            <Text>
+              {language === 'en' ? 'Delivery Charge' : 'डिलीवरी चार्ज'}:
+              {' '}{money(order.deliveryCharge)}
+            </Text>
+            <Text>
+              {language === 'en' ? 'Weight Extra Charge' : 'वजन का अतिरिक्त चार्ज'}:
+              {' '}{money(order.weightSurcharge)}
+            </Text>
+            <Text>
+              {language === 'en' ? 'App Fee' : 'ऐप फीस'}:
+              {' '}{money(order.appFee)}
+            </Text>
+            {order.totalWeightKg !== null &&
+              order.totalWeightKg !== undefined && (
+                <Text>
+                  {language === 'en' ? 'Total Weight' : 'कुल वजन'}:
+                  {' '}{order.totalWeightKg} kg
+                </Text>
+              )}
+          </>
+        ) : (
+          <Text style={styles.muted}>
+            {language === 'en'
+              ? 'Extra charges were not saved separately for this older order.'
+              : 'इस पुराने ऑर्डर के अलग-अलग अतिरिक्त चार्ज रिकॉर्ड में सेव नहीं हैं।'}
+          </Text>
+        )}
+
+        <Text style={styles.item}>
+          {language === 'en' ? 'Final Total' : 'अंतिम कुल'}:
+          {' '}{money(order.total)}
+        </Text>
+      </View>
+    );
   }
 
-  async function refreshCustomerOrder(order) {
+async function refreshCustomerOrder(order) {
     if (!order.customerOrderToken) {
       Alert.alert(
         t('refreshStatus'),
