@@ -353,9 +353,9 @@ function rationsetuDistanceKm(lat1, lon1, lat2, lon2) {
     Math.sqrt(a),
     Math.sqrt(1 - a)
   );
-
-// ================= SERVER CHECK =================
 }
+// ================= SERVER CHECK =================
+
 app.get("/", (req, res) => {
   res.json({
     success: true,
