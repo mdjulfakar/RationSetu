@@ -355,7 +355,7 @@ function rationsetuDistanceKm(lat1, lon1, lat2, lon2) {
   );
 
 // ================= SERVER CHECK =================
-
+}
 app.get("/", (req, res) => {
   res.json({
     success: true,
