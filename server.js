@@ -368,7 +368,6 @@ app.get("/", (req, res) => {
 
 app.get("/api/products", async (req, res) => {
   try { 
-  }
     const { data, error } = await supabase
       .from("products")
       .select("*")
