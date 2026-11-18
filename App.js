@@ -1887,17 +1887,7 @@ async function refreshCustomerOrder(order) {
               <Text>
                 {t('address')}: {order.address || '-'}
               </Text>
-
-              <Text style={styles.editLabel}>{t('items')}:</Text>
-              <Text>
-                {order.items
-                  .map(item => `${item.name} × ${item.qty}`)
-                  .join(', ')}
-              </Text>
-
-              <Text style={styles.item}>
-                {t('total')}: {money(order.total)}
-              </Text>
+                {renderBillingBreakdown(order)}
               <Text>{t('payment')}: {order.payment || 'COD'}</Text>
               <Text style={styles.muted}>
                 {order.createdAt || ''}
