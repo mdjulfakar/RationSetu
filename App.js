@@ -717,19 +717,7 @@ export default function App() {
     }
 
     return result.image_url;
-  }     const result = await response.json().catch(() => ({}));
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || result.error || t('uploadFailed'));
     }
-
-    const imageUrl = result.image_url || result.url;
-
-    if (!imageUrl) {
-      throw new Error(t('uploadFailed'));
-    }
-
-    return imageUrl;
   }   async function chooseOfferPhoto() {
     const photo = await chooseProductImage();
 
@@ -861,19 +849,6 @@ export default function App() {
       if (!result.success || !result.offer) {
         throw new Error(result.message || t('changesFailed'));
       }
-
-      setOffers(previous =>
-        previous.map(item =>
-          String(item.id) === String(offer.id)
-            ? result.offer
-            : item,
-        ),
-      );
-
-      Alert.alert(t('success'), t('changesSaved'));
-    } catch (error) {
-      Alert.alert(t('changesFailed'), error.message);
-    }
   }
 
   async function placeOrder() {
