@@ -714,10 +714,8 @@ export default function App() {
 
     if (!response.ok || !result.success || !result.image_url) {
       throw new Error(result.message || t('uploadFailed'));
-    }
-
-    return result.image_url;
-    }
+    }  return result.image_url;
+    
   }   async function chooseOfferPhoto() {
     const photo = await chooseProductImage();
 
