@@ -1,4 +1,3 @@
-```jsx
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
@@ -59,12 +58,6 @@ const translations = {
     mobile: '10 अंकों का मोबाइल नंबर',
     fullAddress: 'पूरा घर का पता',
     pinCode: '6 अंकों का PIN Code',
-    sendOtp: 'OTP भेजें',
-    verifyOtp: 'OTP सत्यापित करें',
-    enterOtp: '6 अंकों का OTP',
-    otpSent: 'OTP भेज दिया गया है।',
-    otpVerified: 'मोबाइल नंबर सत्यापित हो गया।',
-    otpRequired: 'ऑर्डर से पहले मोबाइल OTP सत्यापित करें।',
     offers: 'आज के ऑफर',
     offerTitle: 'ऑफर का शीर्षक',
     offerDescription: 'ऑफर का विवरण',
@@ -195,12 +188,6 @@ const translations = {
     mobile: '10-digit mobile number',
     fullAddress: 'Full home address',
     pinCode: '6-digit PIN Code',
-    sendOtp: 'Send OTP',
-    verifyOtp: 'Verify OTP',
-    enterOtp: '6-digit OTP',
-    otpSent: 'OTP has been sent.',
-    otpVerified: 'Mobile number verified.',
-    otpRequired: 'Verify your mobile number with OTP before ordering.',
     offers: 'Today’s Offers',
     offerTitle: 'Offer title',
     offerDescription: 'Offer description',
@@ -529,8 +516,7 @@ export default function App() {
       }
     }
 
-    initialize();
-    return () => {
+    initialize();     return () => {
       active = false;
     };
   }, []);
@@ -712,15 +698,25 @@ export default function App() {
 
     const result = await response.json().catch(() => ({}));
 
-    if (!response.ok || !result.success || !result.image_url) {
-      throw new Error(result.message || t('uploadFailed'));
-    }  return result.image_url;
-    
-  }   async function chooseOfferPhoto() {
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || result.error || t('uploadFailed'));
+    }
+
+    const imageUrl = result.image_url || result.url;
+
+    if (!imageUrl) {
+      throw new Error(t('uploadFailed'));
+    }
+
+    return imageUrl;
+  }
+
+  async function chooseOfferPhoto() {
     const photo = await chooseProductImage();
 
     if (photo) {
       setNewOfferImage(photo);
+    }
   }
 
   async function saveOffer() {
@@ -834,17 +830,7 @@ export default function App() {
       Alert.alert(t('success'), t('changesSaved'));
     } catch (error) {
       Alert.alert(t('changesFailed'), error.message);
-    }        method: 'PATCH',
-    body: JSON.stringify({
-            is_active: !offer.is_active,
-          }),
-        },
-        adminToken,
-      );
-
-      if (!result.success || !result.offer) {
-        throw new Error(result.message || t('changesFailed'));
-      }
+    }
   }
 
   async function placeOrder() {
@@ -947,8 +933,7 @@ export default function App() {
       setLoading(false);
     }
   } 
-
-  function renderBillingBreakdown(order) {
+function renderBillingBreakdown(order) {
     const items = Array.isArray(order.items) ? order.items : [];
 
     const savedItemSubtotal =
@@ -1027,7 +1012,7 @@ export default function App() {
     );
   }
 
-  async function refreshCustomerOrder(order) {
+async function refreshCustomerOrder(order) {
     if (!order.customerOrderToken) {
       Alert.alert(
         t('refreshStatus'),
@@ -1216,8 +1201,7 @@ export default function App() {
             orders: [...remoteOrders, ...localOnlyOrders],
           };
         });
-      }
-    } catch (error) {
+      }     } catch (error) {
       Alert.alert(t('ordersNotLoaded'), error.message);
     }
   }
@@ -1577,7 +1561,7 @@ export default function App() {
           </View>
         </View>
       ) : null}
-{screen === 'home' && (
+      {screen === 'home' && (
         <ScrollView style={styles.body}>
           <Text style={styles.title}>{t('orderTitle')}</Text>
           <Text style={styles.muted}>{t('serviceArea')}</Text>
@@ -1644,7 +1628,6 @@ export default function App() {
                   <Text style={styles.item}>
                     {cart[product.id] || 0}
                   </Text>
-
                   {button('+', () => changeQuantity(product.id, 1))}
                 </View>
               </View>
@@ -1859,8 +1842,7 @@ export default function App() {
                   t('accept'),
                   () => updateOrderStatus(order.id, 'Accepted'),
                   false,
-                  loading,
-                )}
+                  loading,               )}
                 {button(
                   t('preparing'),
                   () => updateOrderStatus(order.id, 'Preparing'),
@@ -2466,3 +2448,4 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
+                   
