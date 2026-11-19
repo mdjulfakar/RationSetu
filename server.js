@@ -1,3 +1,4 @@
+
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -38,55 +39,6 @@ function requireAdmin(req, res, next) {
   }
 
   next();
-}
-
-// ================= CUSTOMER LOGIN SECURITY =================
-
-function customerLoginSecret() {
-  return (
-    process.env.CUSTOMER_ORDER_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    ""
-  );
-}
-
-function makeCustomerLoginToken(phone) {
-  const secret = customerLoginSecret();
-  if (!secret) throw new Error("Customer login secret is not configured");
-
-  const expires = Date.now() + 30 * 24 * 60 * 60 * 1000;
-  const payload = `${phone}.${expires}`;
-  const signature = crypto
-    .createHmac("sha256", secret)
-    .update("rationsetu-customer-login:" + payload)
-    .digest("hex");
-
-  return `${payload}.${signature}`;
-}
-
-// Verify the signed login token and return the phone number it belongs to.
-function verifyCustomerLoginToken(token) {
-  const parts = String(token || "").split(".");
-  if (parts.length !== 3) return null;
-
-  const [phone, expiresText, suppliedSignature] = parts;
-  if (!/^[6-9]\d{9}$/.test(phone)) return null;
-
-  const expires = Number(expiresText);
-  if (!Number.isSafeInteger(expires) || expires <= Date.now()) return null;
-
-  const secret = customerLoginSecret();
-  if (!secret) return null;
-
-  const payload = `${phone}.${expiresText}`;
-  const expectedSignature = crypto
-    .createHmac("sha256", secret)
-    .update("rationsetu-customer-login:" + payload)
-    .digest("hex");
-
-  return safeTokenEqual(suppliedSignature, expectedSignature)
-    ? phone
-    : null;
 }
 
 // ================= CUSTOMER ORDER SECURITY =================
@@ -162,125 +114,6 @@ function requireCustomerOrderAccess(req, res, next) {
     });
   }
 }
-
-// ================= CUSTOMER: FAST2SMS OTP LOGIN =================
-
-// Send OTP. API key and OTP Template ID must be set in server environment.
-app.post("/api/customer/otp/send", async (req, res) => {
-  try {
-    const phone = String(req.body?.phone || "").replace(/\D/g, "");
-
-    if (!/^[6-9]\d{9}$/.test(phone)) {
-      return res.status(400).json({
-        success: false,
-        message: "कृपया सही 10 अंकों का मोबाइल नंबर डालें।"
-      });
-    }
-
-    const apiKey = process.env.FAST2SMS_API_KEY;
-    const otpId = process.env.FAST2SMS_OTP_ID;
-
-    if (!apiKey || !otpId) {
-      return res.status(503).json({
-        success: false,
-        message: "Fast2SMS API Key या OTP Template ID server में सेट नहीं है।"
-      });
-    }
-
-    const response = await fetch("https://www.fast2sms.com/dev/otp/send", {
-      method: "POST",
-      headers: {
-        "Authorization": apiKey,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        mobile: phone,
-        otp_id: otpId,
-        otp_length: 6,
-        otp_expiry: 5
-      })
-    });
-
-    const result = await response.json();
-
-    if (!response.ok || result.return !== true) {
-      console.error("Fast2SMS send OTP error:", result);
-      return res.status(502).json({
-        success: false,
-        message: result.message || "OTP भेजा नहीं जा सका।"
-      });
-    }
-
-    return res.json({
-      success: true,
-      message: "OTP भेज दिया गया है।"
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "OTP भेजने में समस्या हुई।"
-    });
-  }
-});
-
-// Verify OTP with Fast2SMS and return a signed customer login token.
-app.post("/api/customer/otp/verify", async (req, res) => {
-  try {
-    const phone = String(req.body?.phone || "").replace(/\D/g, "");
-    const otp = String(req.body?.otp || "").trim();
-
-    if (!/^[6-9]\d{9}$/.test(phone) || !/^\d{4,10}$/.test(otp)) {
-      return res.status(400).json({
-        success: false,
-        message: "मोबाइल नंबर या OTP सही नहीं है।"
-      });
-    }
-
-    const apiKey = process.env.FAST2SMS_API_KEY;
-
-    if (!apiKey) {
-      return res.status(503).json({
-        success: false,
-        message: "Fast2SMS API Key server में सेट नहीं है।"
-      });
-    }
-
-    const response = await fetch("https://www.fast2sms.com/dev/otp/verify", {
-      method: "POST",
-      headers: {
-        "Authorization": apiKey,
-        "Content-Type": "application/json",
-        "Accept": "application/json"
-      },
-      body: JSON.stringify({
-        mobile: phone,
-        otp
-      })
-    });
-
-    const result = await response.json();
-
-    if (!response.ok || result.return !== true) {
-      return res.status(401).json({
-        success: false,
-        message: result.message || "OTP गलत या समाप्त हो गया है।"
-      });
-    }
-
-    return res.json({
-      success: true,
-      message: "मोबाइल नंबर सत्यापित हो गया।",
-      phone,
-      customer_token: makeCustomerLoginToken(phone)
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message || "OTP सत्यापन में समस्या हुई।"
-    });
-  }
-});
 
 // ================= SHOP SETTINGS =================
 
@@ -413,25 +246,14 @@ app.post("/api/orders", async (req, res) => {
       total_amount,
       customer_lat,
       customer_lng,
-      customer_token
     } = req.body;
 
-    const verifiedPhone = verifyCustomerLoginToken(customer_token);
     const submittedPhone = String(req.body.mobile || "").replace(/\D/g, "");
 
-    if (!verifiedPhone) {
-      return res.status(401).json({
+    if (!/^[6-9]\d{9}$/.test(submittedPhone)) {
+      return res.status(400).json({
         success: false,
-        code: "CUSTOMER_OTP_REQUIRED",
-        message: "ऑर्डर करने से पहले मोबाइल OTP सत्यापित करें।"
-      });
-    }
-
-    if (!submittedPhone || submittedPhone !== verifiedPhone) {
-      return res.status(403).json({
-        success: false,
-        code: "CUSTOMER_PHONE_MISMATCH",
-        message: "सत्यापित मोबाइल नंबर और ऑर्डर का मोबाइल नंबर मेल नहीं खाते।"
+        message: "कृपया सही 10 अंकों का मोबाइल नंबर दर्ज करें।"
       });
     }
 
@@ -546,7 +368,7 @@ app.post("/api/orders", async (req, res) => {
 
 const order = {
   customer_name: String(customer_name).trim(),
-  mobile: verifiedPhone,
+  mobile: submittedPhone,
   address: String(address).trim(),
   pin_code: String(pin_code).trim(),
   items,
@@ -673,6 +495,7 @@ app.get(
 
 app.patch(
   "/api/orders/:id/cancel",
+
   requireCustomerOrderAccess,
   async (req, res) => {
     try {
@@ -1169,6 +992,7 @@ app.post("/api/admin/products", requireAdmin, async (req, res) => {
       product: data
     });
   } catch (error) {
+
     res.status(500).json({
       success: false,
       message: error.message
@@ -1663,3 +1487,4 @@ app.post("/api/presence/heartbeat", (req, res) => {
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`RationSetu server running on port ${PORT}`);
 });   
+
