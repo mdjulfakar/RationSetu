@@ -1,3 +1,4 @@
+```jsx
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
@@ -396,7 +397,7 @@ export default function App() {
     },
   });
 
-  const [screen, setScreen] = useState('login');
+  const [screen, setScreen] = useState('home');
   const [language, setLanguage] = useState('hi');
   const t = key =>
     translations[language]?.[key] || translations.hi[key] || key;
@@ -406,10 +407,6 @@ export default function App() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [pinCode, setPinCode] = useState('');
-  const [customerOtp, setCustomerOtp] = useState('');
-  const [customerToken, setCustomerToken] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [verifiedPhone, setVerifiedPhone] = useState('');
   const [offers, setOffers] = useState([]);
   const [newOfferTitle, setNewOfferTitle] = useState('');
   const [newOfferDescription, setNewOfferDescription] = useState('');
@@ -438,23 +435,6 @@ export default function App() {
   useEffect(() => {
     loadOffers();
     let active = true;
-    (async () => {
-      try {
-        const [savedToken, savedPhone] = await Promise.all([
-          AsyncStorage.getItem('rationsetu_customer_token'),
-          AsyncStorage.getItem('rationsetu_verified_phone'),
-        ]);
-        if (active && savedToken && savedPhone) {
-  setCustomerToken(savedToken);
-  setVerifiedPhone(savedPhone);
-  setPhone(savedPhone);
-  setScreen('home');
-}
-      } catch (error) {
-        console.log('Customer session restore error:', error);
-      }
-    })();
-
     let interval = null;
     let appStateSubscription = null;
 
@@ -679,88 +659,6 @@ export default function App() {
       customer_lat: position.coords.latitude,
       customer_lng: position.coords.longitude,
     };
-  }   async function sendCustomerOtp() {
-    const mobile = phone.trim();
-
-    if (!/^[6-9]\d{9}$/.test(mobile)) {
-      Alert.alert(t('wrongMobile'), t('fillMobile'));
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = await apiRequest('/api/customer/otp/send', {
-        method: 'POST',
-        body: JSON.stringify({phone: mobile}),
-      });
-
-      if (!result.success) {
-        throw new Error(result.message || t('uploadFailed'));
-      }
-
-      setOtpSent(true);
-      setCustomerOtp('');
-      setVerifiedPhone('');
-      setCustomerToken('');
-
-      await AsyncStorage.removeItem('rationsetu_customer_token');
-      await AsyncStorage.removeItem('rationsetu_verified_phone');
-
-      Alert.alert(t('success'), result.message || t('otpSent'));
-    } catch (error) {
-      Alert.alert(t('wrongInfo'), error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function verifyCustomerOtp() {
-    const mobile = phone.trim();
-    const otp = customerOtp.trim();
-
-    if (!/^[6-9]\d{9}$/.test(mobile)) {
-      Alert.alert(t('wrongMobile'), t('fillMobile'));
-      return;
-    }
-
-    if (!/^\d{4,10}$/.test(otp)) {
-      Alert.alert(t('infoIncomplete'), t('enterOtp'));
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = await apiRequest('/api/customer/otp/verify', {
-        method: 'POST',
-        body: JSON.stringify({
-          phone: mobile,
-          otp,
-        }),
-      });
-
-      if (!result.success || !result.customer_token) {
-        throw new Error(result.message || t('otpRequired'));
-      }
-
-      setCustomerToken(result.customer_token);
-      setVerifiedPhone(mobile);
-      setOtpSent(false);
-
-      await AsyncStorage.setItem(
-        'rationsetu_customer_token',
-        result.customer_token,
-      );
-      await AsyncStorage.setItem(
-        'rationsetu_verified_phone',
-        mobile,
-      );
-setScreen('home');
-      Alert.alert(t('success'), result.message || t('otpVerified'));
-    } catch (error) {
-      Alert.alert(t('wrongInfo'), error.message);
-    } finally {
-      setLoading(false);
-    }
   }
 
   async function loadOffers() {
@@ -814,6 +712,13 @@ setScreen('home');
 
     const result = await response.json().catch(() => ({}));
 
+    if (!response.ok || !result.success || !result.image_url) {
+      throw new Error(result.message || t('uploadFailed'));
+    }
+
+    return result.image_url;
+  }     const result = await response.json().catch(() => ({}));
+
     if (!response.ok || !result.success) {
       throw new Error(result.message || result.error || t('uploadFailed'));
     }
@@ -825,9 +730,7 @@ setScreen('home');
     }
 
     return imageUrl;
-  }
-
-  async function chooseOfferPhoto() {
+  }   async function chooseOfferPhoto() {
     const photo = await chooseProductImage();
 
     if (photo) {
@@ -947,6 +850,30 @@ setScreen('home');
     } catch (error) {
       Alert.alert(t('changesFailed'), error.message);
     }
+  }           method: 'PATCH',
+          body: JSON.stringify({
+            is_active: !offer.is_active,
+          }),
+        },
+        adminToken,
+      );
+
+      if (!result.success || !result.offer) {
+        throw new Error(result.message || t('changesFailed'));
+      }
+
+      setOffers(previous =>
+        previous.map(item =>
+          String(item.id) === String(offer.id)
+            ? result.offer
+            : item,
+        ),
+      );
+
+      Alert.alert(t('success'), t('changesSaved'));
+    } catch (error) {
+      Alert.alert(t('changesFailed'), error.message);
+    }
   }
 
   async function placeOrder() {
@@ -1006,7 +933,6 @@ setScreen('home');
           mobile: phone.trim(),
           address: address.trim(),
           pin_code: pinCode.trim(),
-          customer_token: customerToken,
           items: selectedItems,
           total_amount: orderTotal,
           customer_lat: customerLocation.customer_lat,
@@ -1050,7 +976,8 @@ setScreen('home');
       setLoading(false);
     }
   } 
-function renderBillingBreakdown(order) {
+
+  function renderBillingBreakdown(order) {
     const items = Array.isArray(order.items) ? order.items : [];
 
     const savedItemSubtotal =
@@ -1129,7 +1056,7 @@ function renderBillingBreakdown(order) {
     );
   }
 
-async function refreshCustomerOrder(order) {
+  async function refreshCustomerOrder(order) {
     if (!order.customerOrderToken) {
       Alert.alert(
         t('refreshStatus'),
@@ -1679,51 +1606,7 @@ async function refreshCustomerOrder(order) {
           </View>
         </View>
       ) : null}
-{screen === 'login' && (
-  <View style={styles.body}>
-    <Text style={styles.title}>RationSetu</Text>
-    <Text style={styles.muted}>
-      {language === 'en'
-        ? 'Login with mobile number'
-        : 'मोबाइल नंबर से लॉगिन करें'}
-    </Text>
-
-    <Text style={styles.muted}>🇮🇳 +91</Text>
-
-    {field(
-      phone,
-      value => setPhone(value.replace(/\D/g, '').slice(0, 10)),
-      language === 'en' ? '10-digit mobile number' : '10 अंकों का मोबाइल नंबर',
-      'phone-pad',
-    )}
-
-    {button(
-      language === 'en' ? 'Send OTP' : 'OTP भेजें',
-      sendCustomerOtp,
-      true,
-      loading,
-    )}
-
-    {otpSent && (
-      <>
-        {field(
-          customerOtp,
-          value => setCustomerOtp(value.replace(/\D/g, '').slice(0, 6)),
-          language === 'en' ? 'Enter 6-digit OTP' : '6 अंकों का OTP डालें',
-          'number-pad',
-        )}
-
-        {button(
-          language === 'en' ? 'Verify OTP' : 'OTP सत्यापित करें',
-          verifyCustomerOtp,
-          true,
-          loading,
-        )}
-      </>
-    )}
-  </View>
-)}
-      {screen === 'home' && (
+{screen === 'home' && (
         <ScrollView style={styles.body}>
           <Text style={styles.title}>{t('orderTitle')}</Text>
           <Text style={styles.muted}>{t('serviceArea')}</Text>
@@ -1790,6 +1673,7 @@ async function refreshCustomerOrder(order) {
                   <Text style={styles.item}>
                     {cart[product.id] || 0}
                   </Text>
+
                   {button('+', () => changeQuantity(product.id, 1))}
                 </View>
               </View>
@@ -1806,15 +1690,7 @@ async function refreshCustomerOrder(order) {
 
           {field(
             phone,
-            value => {
-              setPhone(value.replace(/\D/g, '').slice(0, 10));
-
-              if (value.trim() !== verifiedPhone) {
-                setVerifiedPhone('');
-                setCustomerToken('');
-                setOtpSent(false);
-              }
-            },
+            value => setPhone(value.replace(/\D/g, '').slice(0, 10)),
             t('mobile'),
             'phone-pad',
           )}
@@ -1972,7 +1848,7 @@ async function refreshCustomerOrder(order) {
           )}
 
           <Text style={styles.title}>{t('adminOrders')}</Text>
-                                        
+
           {data.orders.map(order => (
             <View style={styles.card} key={`admin-${order.id}`}>
               <Text style={styles.item}>Order #{order.id}</Text>
