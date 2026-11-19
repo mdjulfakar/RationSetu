@@ -721,7 +721,6 @@ export default function App() {
 
     if (photo) {
       setNewOfferImage(photo);
-    }
   }
 
   async function saveOffer() {
@@ -835,9 +834,8 @@ export default function App() {
       Alert.alert(t('success'), t('changesSaved'));
     } catch (error) {
       Alert.alert(t('changesFailed'), error.message);
-    }
-  }           method: 'PATCH',
-          body: JSON.stringify({
+    }        method: 'PATCH',
+    body: JSON.stringify({
             is_active: !offer.is_active,
           }),
         },
