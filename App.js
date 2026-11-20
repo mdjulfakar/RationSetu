@@ -1,4 +1,3 @@
-
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
@@ -426,6 +425,7 @@ export default function App() {
     translations[language]?.[key] || translations.hi[key] || key;
 
   const [cart, setCart] = useState({});
+  const [cartLoaded, setCartLoaded] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -550,6 +550,7 @@ export default function App() {
             setCart(parsedCart);
           }
         }
+        if (active) setCartLoaded(true);
 
         const saved = await AsyncStorage.getItem(KEY);
         if (saved && active) {
@@ -565,6 +566,7 @@ export default function App() {
         }
       } catch (error) {
         console.log('Local storage read error:', error);
+        if (active) setCartLoaded(true);
       }
 
       try {
@@ -600,10 +602,12 @@ export default function App() {
   }, [language]);
 
   useEffect(() => {
+    if (!cartLoaded) return;
+
     AsyncStorage.setItem(CART_KEY, JSON.stringify(cart)).catch(error =>
       console.log('Cart save error:', error),
     );
-  }, [cart]);
+  }, [cart, cartLoaded]);
 
   const items = useMemo(
     () =>
@@ -732,1596 +736,1007 @@ export default function App() {
     if (!profileAddress.trim()) {
       Alert.alert(t('addressIncomplete'), t('fillAddress'));
       return;
-    }
-    if (!/^[0-9]{6}$/.test(profilePinCode.trim())) {
-      Alert.alert(t('pinRequired'));
-      return;
-    }
-
-    const profile = {
-      name: profileName.trim(),
-      phone: cleanPhone,
-      address: profileAddress.trim(),
-      pinCode: profilePinCode.trim(),
-    };
-
-    try {
-      await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-      setName(profile.name);
-      setPhone(profile.phone);
-      setAddress(profile.address);
-      setPinCode(profile.pinCode);
-      Alert.alert(t('success'), t('profileSaved'));
-    } catch (error) {
-      Alert.alert(t('updateFailed'), error.message);
-    }
-  }
-
-  async function getCustomerLocation() {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== 'granted') {
-      throw new Error(
-        language === 'en'
-          ? 'Location permission is required to place an order.'
-          : 'ऑर्डर करने के लिए लोकेशन की अनुमति देना जरूरी है।',
-      );
-    }
-
-    const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-
-    return {
-      customer_lat: position.coords.latitude,
-      customer_lng: position.coords.longitude,
-    };
-  }   async function loadOffers() {
-    try {
-      const result = await apiRequest('/api/offers');
-
-      if (result.success && Array.isArray(result.offers)) {
-        setOffers(result.offers);
-      }
-    } catch (error) {
-      console.log('Offers load error:', error.message);
-    }
-  }
-
-  async function loadAdminOffers(token = adminToken) {
-    if (!token) return;
-
-    try {
-      const result = await apiRequest('/api/admin/offers', {}, token);
-
-      if (result.success && Array.isArray(result.offers)) {
-        setOffers(result.offers);
-      }
-    } catch (error) {
-      Alert.alert(t('ordersNotLoaded'), error.message);
-    }
-  }
-
-  async function uploadOfferImage(photo) {
-    if (!photo?.uri) throw new Error(t('uploadFailed'));
-
-    const form = new FormData();
-    form.append('file', {
-      uri: photo.uri,
-      name: photo.fileName || `offer-${Date.now()}.jpg`,
-      type: photo.mimeType || 'image/jpeg',
-    });
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/admin/offers/upload-image`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
-        body: form,
-      },
-    );
-
-    const result = await response.json().catch(() => ({}));
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || result.error || t('uploadFailed'));
-    }
-
-    const imageUrl = result.image_url || result.url;
-    if (!imageUrl) throw new Error(t('uploadFailed'));
-
-    return imageUrl;
-  }
-
-  async function chooseOfferPhoto() {
-    const photo = await chooseProductImage();
-    if (photo) setNewOfferImage(photo);
-  }
-
-  async function saveOffer() {
-    if (!newOfferTitle.trim()) {
-      Alert.alert(t('infoIncomplete'), t('offerTitle'));
-      return;
-    }
-
-    if (!adminToken) {
-      Alert.alert(t('adminError'), t('adminFailed'));
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      let imageUrl = newOfferImage?.uri
-        ? await uploadOfferImage(newOfferImage)
-        : '';
-
-      const existingOffer = offers.find(
-        item => String(item.id) === String(editingOfferId),
-      );
-
-      if (!imageUrl && existingOffer) {
-        imageUrl = existingOffer.image_url || '';
-      }
-
-      const payload = {
-        title: newOfferTitle.trim(),
-        description: newOfferDescription.trim(),
-        image_url: imageUrl,
+    }       const profile = {
+        name: profileName.trim(),
+        phone: cleanPhone,
+        address: profileAddress.trim(),
+        pinCode: profilePinCode.trim(),
       };
 
-      const isEditing = Boolean(editingOfferId);
+      try {
+        await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+        setName(profile.name);
+        setPhone(profile.phone);
+        setAddress(profile.address);
+        setPinCode(profile.pinCode);
+        Alert.alert(t('success'), t('profileSaved'));
+      } catch (error) {
+        Alert.alert(t('updateFailed'), error.message);
+      }
+    }
 
-      const result = await apiRequest(
-        isEditing
-          ? `/api/admin/offers/${encodeURIComponent(editingOfferId)}`
-          : '/api/admin/offers',
-        {
-          method: isEditing ? 'PATCH' : 'POST',
-          body: JSON.stringify(payload),
-        },
-        adminToken,
-      );
-
-      if (!result.success || !result.offer) {
-        throw new Error(result.message || t('uploadFailed'));
+    async function getCustomerLocation() {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (permission.status !== 'granted') {
+        throw new Error(
+          language === 'en'
+            ? 'Location permission is required to place an order.'
+            : 'ऑर्डर करने के लिए लोकेशन की अनुमति देना जरूरी है।',
+        );
       }
 
-      setOffers(previous =>
-        isEditing
-          ? previous.map(item =>
-              String(item.id) === String(result.offer.id)
-                ? result.offer
-                : item,
-            )
-          : [result.offer, ...previous],
-      );
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
 
-      setNewOfferTitle('');
-      setNewOfferDescription('');
-      setNewOfferImage(null);
-      setEditingOfferId('');
+      return {
+        customer_lat: position.coords.latitude,
+        customer_lng: position.coords.longitude,
+      };
+    }   async function loadOffers() {
+      try {
+        const result = await apiRequest('/api/offers');
 
-      Alert.alert(t('success'), t('changesSaved'));
-    } catch (error) {
-      Alert.alert(t('uploadFailed'), error.message);
-    } finally {
-      setLoading(false);
+        if (result.success && Array.isArray(result.offers)) {
+          setOffers(result.offers);
+        }
+      } catch (error) {
+        console.log('Offers load error:', error.message);
+      }
     }
-  }
 
-  function startEditOffer(offer) {
-    setEditingOfferId(String(offer.id));
-    setNewOfferTitle(offer.title || '');
-    setNewOfferDescription(offer.description || '');
-    setNewOfferImage(null);
-  }
+    async function loadAdminOffers(token = adminToken) {
+      if (!token) return;
 
-  async function toggleOffer(offer) {
-    if (!adminToken || !offer?.id) return;
+      try {
+        const result = await apiRequest('/api/admin/offers', {}, token);
 
-    try {
-      const result = await apiRequest(
-        `/api/admin/offers/${encodeURIComponent(offer.id)}`,
+        if (result.success && Array.isArray(result.offers)) {
+          setOffers(result.offers);
+        }
+      } catch (error) {
+        Alert.alert(t('ordersNotLoaded'), error.message);
+      }
+    }
+
+    async function uploadOfferImage(photo) {
+      if (!photo?.uri) throw new Error(t('uploadFailed'));
+
+      const form = new FormData();
+      form.append('file', {
+        uri: photo.uri,
+        name: photo.fileName || `offer-${Date.now()}.jpg`,
+        type: photo.mimeType || 'image/jpeg',
+      });
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/admin/offers/upload-image`,
         {
-          method: 'PATCH',
-          body: JSON.stringify({
-            is_active: !offer.is_active,
-          }),
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+          },
+          body: form,
         },
-        adminToken,
       );
 
-      if (!result.success || !result.offer) {
-        throw new Error(result.message || t('changesFailed'));
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || t('uploadFailed'));
       }
 
-      setOffers(previous =>
-        previous.map(item =>
-          String(item.id) === String(offer.id)
-            ? result.offer
-            : item,
-        ),
-      );
+      const imageUrl = result.image_url || result.url;
+      if (!imageUrl) throw new Error(t('uploadFailed'));
 
-      Alert.alert(t('success'), t('changesSaved'));
-    } catch (error) {
-      Alert.alert(t('changesFailed'), error.message);
-    }
-  }
-
-  async function placeOrder() {
-    if (loading) return;
-
-    const customerName = profileName.trim();
-    const customerPhone = profilePhone.trim();
-    const customerPin = profilePinCode.trim();
-    const customerAddress = useAlternateAddress
-      ? deliveryAddress.trim()
-      : profileAddress.trim();
-
-    if (!customerName) {
-      Alert.alert(t('infoIncomplete'), t('fillName'));
-      setScreen('profile');
-      return;
+      return imageUrl;
     }
 
-    if (!/^[0-9]{10}$/.test(customerPhone)) {
-      Alert.alert(t('wrongMobile'), t('fillMobile'));
-      setScreen('profile');
-      return;
+    async function chooseOfferPhoto() {
+      const photo = await chooseProductImage();
+      if (photo) setNewOfferImage(photo);
     }
 
-    if (!customerAddress) {
-      Alert.alert(t('addressIncomplete'), t('fillAddress'));
-      setScreen('profile');
-      return;
-    }
+    async function saveOffer() {
+      if (!newOfferTitle.trim()) {
+        Alert.alert(t('infoIncomplete'), t('offerTitle'));
+        return;
+      }
 
-    if (!/^[0-9]{6}$/.test(customerPin)) {
-      Alert.alert(
-        t('addressIncomplete'),
-        language === 'en'
-          ? 'Enter a valid 6-digit PIN Code in your Profile.'
-          : 'प्रोफाइल में सही 6 अंकों का PIN Code भरें।',
-      );
-      setScreen('profile');
-      return;
-    }
+      if (!adminToken) {
+        Alert.alert(t('adminError'), t('adminFailed'));
+        return;
+      }
 
-    const selectedItems = Object.entries(cart)
-      .filter(
-        ([id, quantity]) =>
-          quantity > 0 &&
-          data.products.some(product => product.id === id),
-      )
-      .map(([id, quantity]) => {
-        const product = data.products.find(item => item.id === id);
+      setLoading(true);
 
-        return {
-          name: product.name,
-          price: product.price,
-          qty: quantity,
-          unit: product.unit,
+      try {
+        let imageUrl = newOfferImage?.uri
+          ? await uploadOfferImage(newOfferImage)
+          : '';
+
+        const existingOffer = offers.find(
+          item => String(item.id) === String(editingOfferId),
+        );
+
+        if (!imageUrl && existingOffer) {
+          imageUrl = existingOffer.image_url || '';
+        }
+
+        const payload = {
+          title: newOfferTitle.trim(),
+          description: newOfferDescription.trim(),
+          image_url: imageUrl,
         };
-      });
 
-    if (!selectedItems.length) {
-      Alert.alert(t('noItem'), t('chooseItem'));
-      return;
-    }
+        const isEditing = Boolean(editingOfferId);
 
-    const orderTotal = selectedItems.reduce(
-      (sum, item) => sum + item.price * item.qty,
-      0,
-    );
+        const result = await apiRequest(
+          isEditing
+            ? `/api/admin/offers/${encodeURIComponent(editingOfferId)}`
+            : '/api/admin/offers',
+          {
+            method: isEditing ? 'PATCH' : 'POST',
+            body: JSON.stringify(payload),
+          },
+          adminToken,
+        );
 
-    setLoading(true);
+        if (!result.success || !result.offer) {
+          throw new Error(result.message || t('uploadFailed'));
+        }
 
-    try {
-      const customerLocation = await getCustomerLocation();
+        setOffers(previous =>
+          isEditing
+            ? previous.map(item =>
+                String(item.id) === String(result.offer.id)
+                  ? result.offer
+                  : item,
+              )
+            : [result.offer, ...previous],
+        );
 
-      const result = await apiRequest('/api/orders', {
-        method: 'POST',
-        body: JSON.stringify({
-          customer_name: customerName,
-          mobile: customerPhone,
-          address: customerAddress,
-          pin_code: customerPin,
-          items: selectedItems,
-          total_amount: orderTotal,
-          customer_lat: customerLocation.customer_lat,
-          customer_lng: customerLocation.customer_lng,
-        }),
-      });
+        setNewOfferTitle('');
+        setNewOfferDescription('');
+        setNewOfferImage(null);
+        setEditingOfferId('');
 
-      if (!result.success || !result.order) {
-        throw new Error(result.message || t('orderNotSaved'));
+        Alert.alert(t('success'), t('changesSaved'));
+      } catch (error) {
+        Alert.alert(t('uploadFailed'), error.message);
+      } finally {
+        setLoading(false);
       }
-
-      const savedOrder = normalizeOrder({
-        ...result.order,
-        customer_name: result.order.customer_name || customerName,
-        mobile: result.order.mobile || customerPhone,
-        address: result.order.address || customerAddress,
-        items: result.order.items || selectedItems,
-        total_amount: result.order.total_amount ?? orderTotal,
-        customer_order_token:
-          result.customer_order_token ||
-          result.order.customer_order_token,
-      });
-
-      setData(previous => ({
-        ...previous,
-        orders: [
-          savedOrder,
-          ...previous.orders.filter(
-            order => order.id !== savedOrder.id,
-          ),
-        ],
-      }));
-
-      setCart({});
-      await AsyncStorage.setItem(CART_KEY, JSON.stringify({}));
-
-      setScreen('success');
-      Alert.alert(t('orderSuccessTitle'), t('orderServerSuccess'));
-    } catch (error) {
-      Alert.alert(t('orderFailed'), error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function renderBillingBreakdown(order) {
-    const items = Array.isArray(order.items) ? order.items : [];
-
-    const savedItemSubtotal =
-      order.itemSubtotal !== null &&
-      order.itemSubtotal !== undefined
-        ? Number(order.itemSubtotal)
-        : items.reduce(
-            (sum, item) =>
-              sum +
-              Number(item.price || 0) * Number(item.qty || 0),
-            0,
-          );
-
-    const hasSavedCharges =
-      order.deliveryCharge !== null &&
-      order.deliveryCharge !== undefined &&
-      order.weightSurcharge !== null &&
-      order.weightSurcharge !== undefined &&
-      order.appFee !== null &&
-      order.appFee !== undefined;
-
-    return (
-      <View style={styles.historyBox}>
-        <Text style={styles.editLabel}>
-          {language === 'en' ? 'Bill Breakdown' : 'बिल का पूरा हिसाब'}
-        </Text>
-
-        {items.map((item, index) => (
-          <Text key={`${order.id}-bill-${index}`}>
-            {item.name}: {money(item.price)} × {item.qty} {item.unit || ''}
-            {' = '}
-            {money(Number(item.price || 0) * Number(item.qty || 0))}
-          </Text>
-        ))}
-
-        <Text>
-          {language === 'en' ? 'Items Subtotal' : 'सामान का कुल'}:
-          {' '}{money(savedItemSubtotal)}
-        </Text>
-
-        {hasSavedCharges ? (
-          <>
-            <Text>
-              {language === 'en' ? 'Delivery Charge' : 'डिलीवरी चार्ज'}:
-              {' '}{money(order.deliveryCharge)}
-            </Text>
-            <Text>
-              {language === 'en' ? 'Weight Extra Charge' : 'वजन का अतिरिक्त चार्ज'}:
-              {' '}{money(order.weightSurcharge)}
-            </Text>
-            <Text>
-              {language === 'en' ? 'App Fee' : 'ऐप फीस'}:
-              {' '}{money(order.appFee)}
-            </Text>
-
-            {order.totalWeightKg !== null &&
-              order.totalWeightKg !== undefined && (
-                <Text>
-                  {language === 'en' ? 'Total Weight' : 'कुल वजन'}:
-                  {' '}{order.totalWeightKg} kg
-                </Text>
-              )}
-          </>
-        ) : (
-          <Text style={styles.muted}>
-            {language === 'en'
-              ? 'Extra charges were not saved separately for this older order.'
-              : 'इस पुराने ऑर्डर के अलग-अलग अतिरिक्त चार्ज रिकॉर्ड में सेव नहीं हैं।'}
-          </Text>
-        )}
-
-        <Text style={styles.item}>
-          {language === 'en' ? 'Final Total' : 'अंतिम कुल'}:
-          {' '}{money(order.total)}
-        </Text>
-      </View>
-    );
-  }
-
-  async function refreshCustomerOrder(order) {
-    if (!order.customerOrderToken) {
-      Alert.alert(
-        t('refreshStatus'),
-        language === 'en'
-          ? 'This older order has no refresh token saved on this phone.'
-          : 'इस पुराने ऑर्डर का स्टेटस टोकन इस फोन में सेव नहीं है।',
-      );
-      return;
     }
 
-    try {
-      const result = await apiRequest(
-        `/api/orders/${encodeURIComponent(order.id)}/status`,
-        {},
-        order.customerOrderToken,
-      );
-
-      if (result.success && result.order) {
-        const updated = normalizeOrder({
-          ...result.order,
-          customer_order_token:
-            result.order.customer_order_token ||
-            order.customerOrderToken,
-          history: result.history || [],
-        });
-
-        setData(previous => ({
-          ...previous,
-          orders: previous.orders.map(item =>
-            item.id === order.id ? {...item, ...updated} : item,
-          ),
-        }));
-      }
-    } catch (error) {
-      Alert.alert(t('ordersNotLoaded'), error.message);
-    }
-  }
-
-  function cancelCustomerOrder(order) {
-    if (
-      ['Delivered', 'Cancelled'].includes(order.status) ||
-      !order.customerOrderToken
-    ) {
-      Alert.alert(t('cannotCancel'));
-      return;
+    function startEditOffer(offer) {
+      setEditingOfferId(String(offer.id));
+      setNewOfferTitle(offer.title || '');
+      setNewOfferDescription(offer.description || '');
+      setNewOfferImage(null);
     }
 
-    setCancellationOrder(order);
-    setCancellationReason('');
-  }
+    async function toggleOffer(offer) {
+      if (!adminToken || !offer?.id) return;
 
-  async function submitCancellation() {
-    const reason = cancellationReason.trim();
+      try {
+        const result = await apiRequest(
+          `/api/admin/offers/${encodeURIComponent(offer.id)}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({
+              is_active: !offer.is_active,
+            }),
+          },
+          adminToken,
+        );
 
-    if (!reason) {
-      Alert.alert(t('reasonRequired'));
-      return;
-    }
+        if (!result.success || !result.offer) {
+          throw new Error(result.message || t('changesFailed'));
+        }
 
-    if (!cancellationOrder?.customerOrderToken) {
-      Alert.alert(t('cannotCancel'));
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const result = await apiRequest(
-        `/api/orders/${encodeURIComponent(cancellationOrder.id)}/cancel`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({reason}),
-        },
-        cancellationOrder.customerOrderToken,
-      );
-
-      if (result.success) {
-        const updatedOrder = normalizeOrder({
-          ...(result.order || cancellationOrder),
-          status: result.order?.status || 'Cancelled',
-          cancellation_reason:
-            result.order?.cancellation_reason ||
-            result.order?.cancellationReason ||
-            reason,
-        });
-
-        setData(previous => ({
-          ...previous,
-          orders: previous.orders.map(item =>
-            item.id === cancellationOrder.id
-              ? {...item, ...updatedOrder}
+        setOffers(previous =>
+          previous.map(item =>
+            String(item.id) === String(offer.id)
+              ? result.offer
               : item,
           ),
-        }));
+        );
 
-        setCancellationOrder(null);
-        setCancellationReason('');
-
-        Alert.alert(t('success'), t('orderCancelled'));
-      } else {
-        Alert.alert(t('cannotCancel'));
+        Alert.alert(t('success'), t('changesSaved'));
+      } catch (error) {
+        Alert.alert(t('changesFailed'), error.message);
       }
-    } catch (error) {
-      Alert.alert(t('updateFailed'), error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function adminLogin() {
-    if (!adminId.trim() || !adminPassword.trim()) {
-      Alert.alert(t('infoIncomplete'), t('adminInfo'));
-      return;
     }
 
-    setLoading(true);
+    async function placeOrder() {
+      if (loading) return;
 
-    try {
-      const result = await apiRequest('/api/admin/login', {
-        method: 'POST',
-        body: JSON.stringify({
-          admin_id: adminId.trim(),
-          password: adminPassword,
-        }),
-      });
+      const customerName = profileName.trim();
+      const customerPhone = profilePhone.trim();
+      const customerPin = profilePinCode.trim();
+      const customerAddress = useAlternateAddress
+        ? deliveryAddress.trim()
+        : profileAddress.trim();
 
-      if (!result.success || !result.token) {
-        throw new Error(t('adminFailed'));
+      if (!customerName) {
+        Alert.alert(t('infoIncomplete'), t('fillName'));
+        setScreen('profile');
+        return;
       }
 
-      setAdminToken(result.token);
-      setAdminPassword('');
+      if (!/^[0-9]{10}$/.test(customerPhone)) {
+        Alert.alert(t('wrongMobile'), t('fillMobile'));
+        setScreen('profile');
+        return;
+      }
 
-      await loadAdminOrders(result.token);
-      await loadAdminOffers(result.token);
+      if (!customerAddress) {
+        Alert.alert(t('addressIncomplete'), t('fillAddress'));
+        setScreen('profile');
+        return;
+      }
 
-      setScreen('admin');
-      Alert.alert(t('success'), t('adminLoginSuccess'));
-    } catch (error) {
-      Alert.alert(t('adminError'), error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+      if (!/^[0-9]{6}$/.test(customerPin)) {
+        Alert.alert(
+          t('addressIncomplete'),
+          language === 'en'
+            ? 'Enter a valid 6-digit PIN Code in your Profile.'
+            : 'प्रोफाइल में सही 6 अंकों का PIN Code भरें।',
+        );
+        setScreen('profile');
+        return;
+      }
 
-  async function loadAdminOrders(token = adminToken) {
-    if (!token) return;
-
-    try {
-      const result = await apiRequest('/api/admin/orders', {}, token);
-
-      if (result.success && Array.isArray(result.orders)) {
-        setData(previous => {
-          const localById = new Map(
-            previous.orders.map(order => [
-              String(order.id),
-              order,
-            ]),
-          );
-
-          const remoteOrders = result.orders.map(rawOrder => {
-            const remote = normalizeOrder(rawOrder);
-            const local = localById.get(String(remote.id));
-
-            return {
-              ...local,
-              ...remote,
-              customerOrderToken:
-                remote.customerOrderToken ||
-                local?.customerOrderToken ||
-                '',
-            };
-          });
-
-          const remoteIds = new Set(
-            remoteOrders.map(order => String(order.id)),
-          );
-
-          const localOnlyOrders = previous.orders.filter(
-            order => !remoteIds.has(String(order.id)),
-          );
+      const selectedItems = Object.entries(cart)
+        .filter(
+          ([id, quantity]) =>
+            quantity > 0 &&
+            data.products.some(product => product.id === id),
+        )
+        .map(([id, quantity]) => {
+          const product = data.products.find(item => item.id === id);
 
           return {
-            ...previous,
-            orders: [...remoteOrders, ...localOnlyOrders],
+            name: product.name,
+            price: product.price,
+            qty: quantity,
+            unit: product.unit,
           };
         });
+
+      if (!selectedItems.length) {
+        Alert.alert(t('noItem'), t('chooseItem'));
+        return;
       }
-    } catch (error) {
-      Alert.alert(t('ordersNotLoaded'), error.message);
-    }
-  }
 
-  async function updateOrderStatus(orderId, status) {
-    if (loading) return;
-
-    setLoading(true);
-
-    try {
-      const result = await apiRequest(
-        `/api/admin/orders/${encodeURIComponent(orderId)}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({status}),
-        },
-        adminToken,
+      const orderTotal = selectedItems.reduce(
+        (sum, item) => sum + item.price * item.qty,
+        0,
       );
 
-      if (result.success) {
+      setLoading(true);
+
+      try {
+        const customerLocation = await getCustomerLocation();
+
+        const result = await apiRequest('/api/orders', {
+          method: 'POST',
+          body: JSON.stringify({
+            customer_name: customerName,
+            mobile: customerPhone,
+            address: customerAddress,
+            pin_code: customerPin,
+            items: selectedItems,
+            total_amount: orderTotal,
+            customer_lat: customerLocation.customer_lat,
+            customer_lng: customerLocation.customer_lng,
+          }),
+        });
+
+        if (!result.success || !result.order) {
+          throw new Error(result.message || t('orderNotSaved'));
+        }
+
+        const savedOrder = normalizeOrder({
+          ...result.order,
+          customer_name: result.order.customer_name || customerName,
+          mobile: result.order.mobile || customerPhone,
+          address: result.order.address || customerAddress,
+          items: result.order.items || selectedItems,
+          total_amount: result.order.total_amount ?? orderTotal,
+          customer_order_token:
+            result.customer_order_token ||
+            result.order.customer_order_token,
+        });
+
         setData(previous => ({
           ...previous,
-          orders: previous.orders.map(order =>
-            String(order.id) === String(orderId)
-              ? {...order, status: result.order?.status || status}
-              : order,
-          ),
+          orders: [
+            savedOrder,
+            ...previous.orders.filter(
+              order => order.id !== savedOrder.id,
+            ),
+          ],
         }));
 
-        Alert.alert(t('success'), t('orderUpdated'));
+        setCart({});
+        await AsyncStorage.setItem(CART_KEY, JSON.stringify({}));
+
+        setScreen('success');
+        Alert.alert(t('orderSuccessTitle'), t('orderServerSuccess'));
+      } catch (error) {
+        Alert.alert(t('orderFailed'), error.message);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      Alert.alert(t('updateFailed'), error.message);
-    } finally {
-      setLoading(false);
     }
-  }
 
-  async function chooseProductImage() {
-    try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+    function renderBillingBreakdown(order) {
+      const items = Array.isArray(order.items) ? order.items : [];
 
-      if (!permission.granted) {
+      const savedItemSubtotal =
+        order.itemSubtotal !== null &&
+        order.itemSubtotal !== undefined
+          ? Number(order.itemSubtotal)
+          : items.reduce(
+              (sum, item) =>
+                sum +
+                Number(item.price || 0) * Number(item.qty || 0),
+              0,
+            );
+
+      const hasSavedCharges =
+        order.deliveryCharge !== null &&
+        order.deliveryCharge !== undefined &&
+        order.weightSurcharge !== null &&
+        order.weightSurcharge !== undefined &&
+        order.appFee !== null &&
+        order.appFee !== undefined;
+
+      return (
+        <View style={styles.historyBox}>
+          <Text style={styles.editLabel}>
+            {language === 'en' ? 'Bill Breakdown' : 'बिल का पूरा हिसाब'}
+          </Text>
+
+          {items.map((item, index) => (
+            <Text key={`${order.id}-bill-${index}`}>
+              {item.name}: {money(item.price)} × {item.qty} {item.unit || ''}
+              {' = '}
+              {money(Number(item.price || 0) * Number(item.qty || 0))}
+            </Text>
+          ))}
+
+          <Text>
+            {language === 'en' ? 'Items Subtotal' : 'सामान का कुल'}:
+            {' '}{money(savedItemSubtotal)}
+          </Text>
+
+          {hasSavedCharges ? (
+            <>
+              <Text>
+                {language === 'en' ? 'Delivery Charge' : 'डिलीवरी चार्ज'}:
+                {' '}{money(order.deliveryCharge)}
+              </Text>
+              <Text>
+                {language === 'en' ? 'Weight Extra Charge' : 'वजन का अतिरिक्त चार्ज'}:
+                {' '}{money(order.weightSurcharge)}
+              </Text>
+              <Text>
+                {language === 'en' ? 'App Fee' : 'ऐप फीस'}:
+                {' '}{money(order.appFee)}
+              </Text>
+
+              {order.totalWeightKg !== null &&
+                order.totalWeightKg !== undefined && (
+                  <Text>
+                    {language === 'en' ? 'Total Weight' : 'कुल वजन'}:
+                    {' '}{order.totalWeightKg} kg
+                  </Text>
+                )}
+            </>
+          ) : (
+            <Text style={styles.muted}>
+              {language === 'en'
+                ? 'Extra charges were not saved separately for this older order.'
+                : 'इस पुराने ऑर्डर के अलग-अलग अतिरिक्त चार्ज रिकॉर्ड में सेव नहीं हैं।'}
+            </Text>
+          )}
+
+          <Text style={styles.item}>
+            {language === 'en' ? 'Final Total' : 'अंतिम कुल'}:
+            {' '}{money(order.total)}
+          </Text>
+        </View>
+      );
+    }
+
+    async function refreshCustomerOrder(order) {
+      if (!order.customerOrderToken) {
+        Alert.alert(
+          t('refreshStatus'),
+          language === 'en'
+            ? 'This older order has no refresh token saved on this phone.'
+            : 'इस पुराने ऑर्डर का स्टेटस टोकन इस फोन में सेव नहीं है।',
+        );
+        return;
+      }
+
+      try {
+        const result = await apiRequest(
+          `/api/orders/${encodeURIComponent(order.id)}/status`,
+          {},
+          order.customerOrderToken,
+        );
+
+        if (result.success && result.order) {
+          const updated = normalizeOrder({
+            ...result.order,
+            customer_order_token:
+              result.order.customer_order_token ||
+              order.customerOrderToken,
+            history: result.history || [],
+          });
+
+          setData(previous => ({
+            ...previous,
+            orders: previous.orders.map(item =>
+              item.id === order.id ? {...item, ...updated} : item,
+            ),
+          }));
+        }
+      } catch (error) {
+        Alert.alert(t('ordersNotLoaded'), error.message);
+      }
+    }
+
+    function cancelCustomerOrder(order) {
+      if (
+        ['Delivered', 'Cancelled'].includes(order.status) ||
+        !order.customerOrderToken
+      ) {
+        Alert.alert(t('cannotCancel'));
+        return;
+      }
+
+      setCancellationOrder(order);
+      setCancellationReason('');
+    }
+
+    async function submitCancellation() {
+      const reason = cancellationReason.trim();
+
+      if (!reason) {
+        Alert.alert(t('reasonRequired'));
+        return;
+      }
+
+      if (!cancellationOrder?.customerOrderToken) {
+        Alert.alert(t('cannotCancel'));
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const result = await apiRequest(
+          `/api/orders/${encodeURIComponent(cancellationOrder.id)}/cancel`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({reason}),
+          },
+          cancellationOrder.customerOrderToken,
+        );
+
+        if (result.success) {
+          const updatedOrder = normalizeOrder({
+            ...(result.order || cancellationOrder),
+            status: result.order?.status || 'Cancelled',
+            cancellation_reason:
+              result.order?.cancellation_reason ||
+              result.order?.cancellationReason ||
+              reason,
+          });
+
+          setData(previous => ({
+            ...previous,
+            orders: previous.orders.map(item =>
+              item.id === cancellationOrder.id
+                ? {...item, ...updatedOrder}
+                : item,
+            ),
+          }));
+
+          setCancellationOrder(null);
+          setCancellationReason('');
+
+          Alert.alert(t('success'), t('orderCancelled'));
+        } else {
+          Alert.alert(t('cannotCancel'));
+        }
+      } catch (error) {
+        Alert.alert(t('updateFailed'), error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function adminLogin() {
+      if (!adminId.trim() || !adminPassword.trim()) {
+        Alert.alert(t('infoIncomplete'), t('adminInfo'));
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const result = await apiRequest('/api/admin/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            admin_id: adminId.trim(),
+            password: adminPassword,
+          }),
+        });
+
+        if (!result.success || !result.token) {
+          throw new Error(t('adminFailed'));
+        }
+
+        setAdminToken(result.token);
+        setAdminPassword('');
+
+        await loadAdminOrders(result.token);
+        await loadAdminOffers(result.token);
+
+        setScreen('admin');
+        Alert.alert(t('success'), t('adminLoginSuccess'));
+      } catch (error) {
+        Alert.alert(t('adminError'), error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function loadAdminOrders(token = adminToken) {
+      if (!token) return;
+
+      try {
+        const result = await apiRequest('/api/admin/orders', {}, token);
+
+        if (result.success && Array.isArray(result.orders)) {
+          setData(previous => {
+            const localById = new Map(
+              previous.orders.map(order => [
+                String(order.id),
+                order,
+              ]),
+            );
+
+            const remoteOrders = result.orders.map(rawOrder => {
+              const remote = normalizeOrder(rawOrder);
+              const local = localById.get(String(remote.id));
+
+              return {
+                ...local,
+                ...remote,
+                customerOrderToken:
+                  remote.customerOrderToken ||
+                  local?.customerOrderToken ||
+                  '',
+              };
+            });
+
+            const remoteIds = new Set(
+              remoteOrders.map(order => String(order.id)),
+            );
+
+            const localOnlyOrders = previous.orders.filter(
+              order => !remoteIds.has(String(order.id)),
+            );
+
+            return {
+              ...previous,
+              orders: [...remoteOrders, ...localOnlyOrders],
+            };
+          });
+        }
+      } catch (error) {
+        Alert.alert(t('ordersNotLoaded'), error.message);
+      }
+    }
+
+    async function updateOrderStatus(orderId, status) {
+      if (loading) return;
+
+      setLoading(true);
+
+      try {
+        const result = await apiRequest(
+          `/api/admin/orders/${encodeURIComponent(orderId)}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({status}),
+          },
+          adminToken,
+        );
+
+        if (result.success) {
+          setData(previous => ({
+            ...previous,
+            orders: previous.orders.map(order =>
+              String(order.id) === String(orderId)
+                ? {...order, status: result.order?.status || status}
+                : order,
+            ),
+          }));
+
+          Alert.alert(t('success'), t('orderUpdated'));
+        }
+      } catch (error) {
+        Alert.alert(t('updateFailed'), error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function chooseProductImage() {
+      try {
+        const permission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (!permission.granted) {
+          Alert.alert(
+            t('productImage'),
+            language === 'en'
+              ? 'Allow photo-library access to choose a product image.'
+              : 'सामान की फोटो चुनने के लिए गैलरी की अनुमति दें।',
+          );
+          return null;
+        }
+
+        const picked = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+
+        if (picked.canceled || !picked.assets?.length) return null;
+
+        return picked.assets[0];
+      } catch (error) {
         Alert.alert(
           t('productImage'),
-          language === 'en'
-            ? 'Allow photo-library access to choose a product image.'
-            : 'सामान की फोटो चुनने के लिए गैलरी की अनुमति दें।',
+          error.message || t('uploadFailed'),
         );
         return null;
       }
+    }
 
-      const picked = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
+    async function selectNewProductImage() {
+      const photo = await chooseProductImage();
+      if (photo) setNewImage(photo);
+    }
+
+    async function uploadProductImage(photo) {
+      if (!photo?.uri) throw new Error(t('uploadFailed'));
+
+      const form = new FormData();
+
+      form.append('file', {
+        uri: photo.uri,
+        name: photo.fileName || `product-${Date.now()}.jpg`,
+        type: photo.mimeType || 'image/jpeg',
       });
 
-      if (picked.canceled || !picked.assets?.length) return null;
-
-      return picked.assets[0];
-    } catch (error) {
-      Alert.alert(
-        t('productImage'),
-        error.message || t('uploadFailed'),
-      );
-      return null;
-    }
-  }
-
-  async function selectNewProductImage() {
-    const photo = await chooseProductImage();
-    if (photo) setNewImage(photo);
-  }
-
-  async function uploadProductImage(photo) {
-    if (!photo?.uri) throw new Error(t('uploadFailed'));
-
-    const form = new FormData();
-
-    form.append('file', {
-      uri: photo.uri,
-      name: photo.fileName || `product-${Date.now()}.jpg`,
-      type: photo.mimeType || 'image/jpeg',
-    });
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/admin/products/upload-image`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
-        body: form,
-      },
-    );
-
-    const result = await response.json().catch(() => ({}));
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || result.error || t('uploadFailed'));
-    }
-
-    const imageUrl = result.image_url || result.url;
-    if (!imageUrl) throw new Error(t('uploadFailed'));
-
-    return imageUrl;
-  }
-
-  async function addProduct() {
-    if (!newName.trim() || !newPrice.trim() || !newStock.trim()) {
-      Alert.alert(t('infoIncomplete'), t('productInfo'));
-      return;
-    }
-
-    const price = Number(newPrice);
-    const stock = Number(newStock);
-
-    if (
-      !Number.isFinite(price) ||
-      price <= 0 ||
-      !Number.isInteger(stock) ||
-      stock < 0
-    ) {
-      Alert.alert(t('wrongInfo'), t('priceStockError'));
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const imageUrl = newImage
-        ? await uploadProductImage(newImage)
-        : null;
-
-      const result = await apiRequest(
-        '/api/admin/products',
+      const response = await fetch(
+        `${API_BASE_URL}/api/admin/products/upload-image`,
         {
           method: 'POST',
-          body: JSON.stringify({
-            name: newName.trim(),
-            price,
-            stock,
-            image_url: imageUrl,
-          }),
+          headers: {
+            Authorization: `Bearer ${adminToken}`,
+          },
+          body: form,
         },
-        adminToken,
       );
 
-      if (!result.success || !result.product) {
-        throw new Error(t('productNotAdded'));
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || t('uploadFailed'));
       }
 
-      setData(previous => ({
-        ...previous,
-        products: [
-          ...previous.products,
-          normalizeProduct(result.product),
-        ],
-      }));
+      const imageUrl = result.image_url || result.url;
+      if (!imageUrl) throw new Error(t('uploadFailed'));
 
-      setNewName('');
-      setNewPrice('');
-      setNewStock('');
-      setNewImage(null);
-
-      Alert.alert(t('success'), t('productAdded'));
-    } catch (error) {
-      Alert.alert(t('productAddFailed'), error.message);
-    } finally {
-      setLoading(false);
+      return imageUrl;
     }
-  }
 
-  async function replaceProductImage(product) {
-    if (loading || uploadingPhotoId) return;
-
-    const photo = await chooseProductImage();
-    if (!photo) return;
-
-    setUploadingPhotoId(product.id);
-
-    try {
-      const imageUrl = await uploadProductImage(photo);
-
-      const result = await apiRequest(
-        `/api/admin/products/${encodeURIComponent(product.id)}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({image_url: imageUrl}),
-        },
-        adminToken,
-      );
-
-      if (!result.success) {
-        throw new Error(result.message || t('uploadFailed'));
+    async function addProduct() {
+      if (!newName.trim() || !newPrice.trim() || !newStock.trim()) {
+        Alert.alert(t('infoIncomplete'), t('productInfo'));
+        return;
       }
 
-      setData(previous => ({
-        ...previous,
-        products: previous.products.map(item =>
-          item.id === product.id
-            ? {...item, image_url: imageUrl}
-            : item,
-        ),
-      }));
+      const price = Number(newPrice);
+      const stock = Number(newStock);
 
-      Alert.alert(t('success'), t('photoUploaded'));
-    } catch (error) {
-      Alert.alert(t('uploadFailed'), error.message);
-    } finally {
-      setUploadingPhotoId('');
-    }
-  }
-
-  async function saveProductPriceStock(product) {
-    if (loading) return;
-
-    const draft = editingProducts[product.id] || {};
-    const priceText = String(draft.price ?? product.price).trim();
-    const stockText = String(draft.stock ?? product.stock).trim();
-    const price = Number(priceText);
-    const stock = Number(stockText);
-
-    if (!priceText || !Number.isFinite(price) || price <= 0) {
-      Alert.alert(t('wrongInfo'), t('changesFailed'));
-      return;
-    }
-
-    if (!stockText || !Number.isInteger(stock) || stock < 0) {
-      Alert.alert(t('wrongInfo'), t('changesFailed'));
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const result = await apiRequest(
-        `/api/admin/products/${encodeURIComponent(product.id)}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify({price, stock}),
-        },
-        adminToken,
-      );
-
-      if (!result.success) {
-        throw new Error(result.message || t('changesFailed'));
+      if (
+        !Number.isFinite(price) ||
+        price <= 0 ||
+        !Number.isInteger(stock) ||
+        stock < 0
+      ) {
+        Alert.alert(t('wrongInfo'), t('priceStockError'));
+        return;
       }
 
-      setData(previous => ({
-        ...previous,
-        products: previous.products.map(item =>
-          item.id === product.id
-            ? {...item, price, stock}
-            : item,
-        ),
-      }));
+      setLoading(true);  try {
+    const imageUrl = newImage
+      ? await uploadProductImage(newImage)
+      : null;
 
-      setEditingProducts(previous => {
-        const next = {...previous};
-        delete next[product.id];
-        return next;
-      });
+    const result = await apiRequest(
+      '/api/admin/products',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newName.trim(),
+          price,
+          stock,
+          image_url: imageUrl,
+        }),
+      },
+      adminToken,
+    );
 
-      Alert.alert(t('success'), t('changesSaved'));
-    } catch (error) {
-      Alert.alert(
-        t('changesFailed'),
-        error.message || t('changesFailed'),
-      );
-    } finally {
-      setLoading(false);
+    if (!result.success || !result.product) {
+      throw new Error(t('productNotAdded'));
     }
+
+    setData(previous => ({
+      ...previous,
+      products: [
+        ...previous.products,
+        normalizeProduct(result.product),
+      ],
+    }));
+
+    setNewName('');
+    setNewPrice('');
+    setNewStock('');
+    setNewImage(null);
+
+    Alert.alert(t('success'), t('productAdded'));
+  } catch (error) {
+    Alert.alert(t('productAddFailed'), error.message);
+  } finally {
+    setLoading(false);
   }
+}
 
-  function logoutAdmin() {
-    setAdminToken('');
-    setAdminId('');
-    setAdminPassword('');
-    setScreen('home');
+async function replaceProductImage(product) {
+  if (loading || uploadingPhotoId) return;
 
-    Alert.alert(t('success'), t('logoutSuccess'));
-  }
+  const photo = await chooseProductImage();
+  if (!photo) return;
 
-  function openSupportEmail() {
-    Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() =>
-      Alert.alert(t('emailSupport'), t('emailOpenError')),
+  setUploadingPhotoId(product.id);
+
+  try {
+    const imageUrl = await uploadProductImage(photo);
+
+    const result = await apiRequest(
+      `/api/admin/products/${encodeURIComponent(product.id)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({image_url: imageUrl}),
+      },
+      adminToken,
     );
+
+    if (!result.success) {
+      throw new Error(result.message || t('uploadFailed'));
+    }
+
+    setData(previous => ({
+      ...previous,
+      products: previous.products.map(item =>
+        item.id === product.id
+          ? {...item, image_url: imageUrl}
+          : item,
+      ),
+    }));
+
+    Alert.alert(t('success'), t('photoUploaded'));
+  } catch (error) {
+    Alert.alert(t('uploadFailed'), error.message);
+  } finally {
+    setUploadingPhotoId('');
+  }
+}
+
+async function saveProductPriceStock(product) {
+  if (loading) return;
+
+  const draft = editingProducts[product.id] || {};
+  const priceText = String(draft.price ?? product.price).trim();
+  const stockText = String(draft.stock ?? product.stock).trim();
+  const price = Number(priceText);
+  const stock = Number(stockText);
+
+  if (!priceText || !Number.isFinite(price) || price <= 0) {
+    Alert.alert(t('wrongInfo'), t('changesFailed'));
+    return;
   }
 
-  function openWhatsApp() {
-    Linking.openURL(
-      `https://wa.me/${SUPPORT_PHONE.replace('+', '')}`,
-    ).catch(() =>
-      Alert.alert('Error', 'WhatsApp could not be opened'),
-    );
+  if (!stockText || !Number.isInteger(stock) || stock < 0) {
+    Alert.alert(t('wrongInfo'), t('changesFailed'));
+    return;
   }
 
-  function callSupport() {
-    Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() =>
-      Alert.alert('Error', 'Calling could not be started'),
+  setLoading(true);
+
+  try {
+    const result = await apiRequest(
+      `/api/admin/products/${encodeURIComponent(product.id)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({price, stock}),
+      },
+      adminToken,
     );
-  }   return (
-    <SafeAreaView style={styles.safe}>
-      {header}
 
-      {screen !== 'login' && (
-        <View style={styles.nav}>
-          {button(t('home'), () => setScreen('home'))}
-          {button(t('myOrders'), () => setScreen('myorders'))}
-          {button(
-            language === 'en' ? 'Admin' : 'एडमिन',
-            () => setScreen('adminLogin'),
-          )}
-        </View>
-      )}
+    if (!result.success) {
+      throw new Error(result.message || t('changesFailed'));
+    }
 
-      {cancellationOrder ? (
-        <View style={styles.cancelOverlay}>
-          <View style={styles.cancelDialog}>
-            <Text style={styles.title}>{t('cancelReasonTitle')}</Text>
-            <TextInput
-              value={cancellationReason}
-              onChangeText={setCancellationReason}
-              placeholder={t('cancelReasonPlaceholder')}
-              multiline
-              textAlignVertical="top"
-              style={styles.cancelReasonInput}
-              placeholderTextColor="#8193a5"
-            />
-            {button(t('submitCancellation'), submitCancellation, true, loading)}
-            {button(
-              language === 'en' ? 'Back' : 'वापस',
-              () => {
-                setCancellationOrder(null);
-                setCancellationReason('');
-              },
-              false,
-              loading,
-            )}
-          </View>
-        </View>
-      ) : null}
+    setData(previous => ({
+      ...previous,
+      products: previous.products.map(item =>
+        item.id === product.id
+          ? {...item, price, stock}
+          : item,
+      ),
+    }));
 
-      {screen === 'home' && (
-        <ScrollView style={styles.body}>
-          <View style={styles.homeTopActions}>
-            <TouchableOpacity
-              style={styles.cartHeaderButton}
-              onPress={() => setScreen('cart')}>
-              <View style={styles.cartIconShape}>
-                <View style={styles.cartHandle} />
-                <View style={styles.cartBasket} />
-                <View style={styles.cartWheelRow}>
-                  <View style={styles.cartWheel} />
-                  <View style={styles.cartWheel} />
-                </View>
-              </View>
-              <Text style={styles.headerActionText}>
-                {language === 'en' ? 'Cart' : 'कार्ट'}
-              </Text>
-              {cartCount > 0 && (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+    setEditingProducts(previous => {
+      const next = {...previous};
+      delete next[product.id];
+      return next;
+    });
 
-            <TouchableOpacity
-              style={styles.profileHeaderButton}
-              onPress={() => setScreen('profile')}>
-              <Text style={styles.profileSymbol}>●</Text>
-              <Text style={styles.headerActionText}>
-                {language === 'en' ? 'Profile' : 'प्रोफाइल'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+    Alert.alert(t('success'), t('changesSaved'));
+  } catch (error) {
+    Alert.alert(
+      t('changesFailed'),
+      error.message || t('changesFailed'),
+    );
+  } finally {
+    setLoading(false);
+  }
+}
 
-          <Text style={styles.title}>{t('orderTitle')}</Text>
-          <Text style={styles.muted}>{t('serviceArea')}</Text>
+function logoutAdmin() {
+  setAdminToken('');
+  setAdminId('');
+  setAdminPassword('');
+  setScreen('home');
 
-          {apiError ? (
-            <Text style={styles.errorText}>{apiError}</Text>
-          ) : null}
+  Alert.alert(t('success'), t('logoutSuccess'));
+}
 
-          {field(search, setSearch, t('search'))}
+function openSupportEmail() {
+  Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() =>
+    Alert.alert(t('emailSupport'), t('emailOpenError')),
+  );
+}
 
-          {offers
-            .filter(offer => offer.is_active === true)
-            .map(offer => (
-              <View style={styles.card} key={`customer-offer-${offer.id}`}>
-                <Text style={styles.title}>{offer.title}</Text>
+function openWhatsApp() {
+  Linking.openURL(
+    `https://wa.me/${SUPPORT_PHONE.replace('+', '')}`,
+  ).catch(() =>
+    Alert.alert('Error', 'WhatsApp could not be opened'),
+  );
+}
 
-                {offer.image_url ? (
-                  <Image
-                    source={{uri: offer.image_url}}
-                    style={styles.offerImage}
-                    resizeMode="cover"
-                  />
-                ) : null}
+function callSupport() {
+  Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() =>
+    Alert.alert('Error', 'Calling could not be started'),
+  );
+}
 
-                {offer.description ? (
-                  <Text style={styles.muted}>{offer.description}</Text>
-                ) : null}
-              </View>
-            ))}
+return (
+  <SafeAreaView style={styles.safe}>
+    {header}
 
-          <View style={styles.productGrid}>
-            {items.map(product => (
-              <View key={product.id} style={styles.productGridCard}>
-                {product.image_url ? (
-                  <Image
-                    source={{uri: product.image_url}}
-                    style={styles.productGridImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View style={styles.productGridImagePlaceholder}>
-                    <Text style={styles.item}>📦</Text>
-                  </View>
-                )}
+    {screen !== 'login' && (
+      <View style={styles.nav}>
+        {button(t('home'), () => setScreen('home'))}
+        {button(t('myOrders'), () => setScreen('myorders'))}
+        {button(
+          language === 'en' ? 'Admin' : 'एडमिन',
+          () => setScreen('adminLogin'),
+        )}
+      </View>
+    )}
 
-                <Text style={styles.productGridName}>
-                  {productLabel(product)}
-                </Text>
-
-                <Text style={styles.productGridPrice}>
-                  {money(product.price)} / {unitLabel(product.unit)}
-                </Text>
-
-                <Text style={styles.productGridStock}>
-                  {t('available')}: {product.stock}
-                </Text>
-
-                <View style={styles.productGridQty}>
-                  {button('−', () => changeQuantity(product.id, -1))}
-                  <Text style={styles.item}>
-                    {cart[product.id] || 0}
-                  </Text>
-                  {button('+', () => changeQuantity(product.id, 1))}
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {items.length === 0 && (
-            <Text style={styles.muted}>{t('noProduct')}</Text>
-          )}
-
-          <View style={styles.total}>
-            <Text style={styles.item}>
-              {t('total')}: {money(total)}
-            </Text>
-            <Text style={styles.muted}>{t('paymentCod')}</Text>
-          </View>
-
-          {button(
-            language === 'en'
-              ? `View Cart (${cartCount})`
-              : `कार्ट देखें (${cartCount})`,
-            () => setScreen('cart'),
-            true,
-          )}
-        </ScrollView>
-      )}
-
-      {screen === 'cart' && (
-        <ScrollView style={styles.body}>
-          <Text style={styles.title}>
-            {language === 'en' ? 'My Cart' : 'मेरा कार्ट'}
-          </Text>
-
-          {Object.entries(cart)
-            .filter(([id, quantity]) =>
-              quantity > 0 &&
-              data.products.some(product => product.id === id),
-            )
-            .map(([id, quantity]) => {
-              const product = data.products.find(item => item.id === id);
-              const lineTotal = Number(product.price || 0) * quantity;
-
-              return (
-                <View style={styles.cartItemCard} key={`cart-${id}`}>
-                  <View style={styles.cartItemDetails}>
-                    {product.image_url ? (
-                      <Image
-                        source={{uri: product.image_url}}
-                        style={styles.cartItemImage}
-                        resizeMode="cover"
-                      />
-                    ) : null}
-
-                    <View style={styles.cartItemText}>
-                      <Text style={styles.item}>
-                        {productLabel(product)}
-                      </Text>
-                      <Text style={styles.muted}>
-                        {money(product.price)} / {unitLabel(product.unit)}
-                      </Text>
-                      <Text style={styles.cartLineTotal}>
-                        {language === 'en' ? 'Amount' : 'रकम'}: {money(lineTotal)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.cartControls}>
-                    <TouchableOpacity
-                      style={styles.cartQtyButton}
-                      onPress={() => changeQuantity(id, -1)}>
-                      <Text style={styles.cartQtyButtonText}>−</Text>
-                    </TouchableOpacity>
-
-                    <Text style={styles.cartQtyNumber}>{quantity}</Text>
-
-                    <TouchableOpacity
-                      style={styles.cartQtyButton}
-                      onPress={() => changeQuantity(id, 1)}>
-                      <Text style={styles.cartQtyButtonText}>+</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.removeCartButton}
-                      onPress={() => removeCartItem(id)}>
-                      <Text style={styles.removeCartText}>
-                        {language === 'en' ? 'Remove' : 'हटाएँ'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-
-          {cartCount === 0 && (
-            <View style={styles.card}>
-              <Text style={styles.item}>
-                {language === 'en' ? 'Your cart is empty.' : 'आपका कार्ट खाली है।'}
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.total}>
-            <Text style={styles.item}>
-              {language === 'en' ? 'Cart Total' : 'कार्ट का कुल'}: {money(total)}
-            </Text>
-            <Text style={styles.muted}>{t('paymentCod')}</Text>
-          </View>
-
-          {cartCount > 0 && (
-            <>
-              <Text style={styles.title}>
-                {language === 'en' ? 'Delivery Details' : 'डिलीवरी की जानकारी'}
-              </Text>
-
-              <Text style={styles.muted}>
-                {language === 'en'
-                  ? 'Your saved Profile details will be used for this order.'
-                  : 'इस ऑर्डर के लिए आपकी प्रोफाइल में सेव जानकारी इस्तेमाल होगी।'}
-              </Text>
-
-              <View style={styles.card}>
-                <Text style={styles.item}>{profileName || '-'}</Text>
-                <Text>{profilePhone || '-'}</Text>
-                <Text>{profileAddress || '-'}</Text>
-                <Text>
-                  {language === 'en' ? 'PIN Code' : 'पिन कोड'}: {profilePinCode || '-'}
-                </Text>
-              </View>
-
-              {button(
-                language === 'en' ? 'Edit Profile' : 'प्रोफाइल बदलें',
-                () => setScreen('profile'),
-              )}
-
-              {button(
-                language === 'en' ? 'Place COD Order' : 'कैश ऑन डिलीवरी ऑर्डर करें',
-                placeOrder,
-                true,
-                loading,
-              )}
-            </>
-          )}
-
-          {button(
-            language === 'en' ? 'Continue Shopping' : 'खरीदारी जारी रखें',
-            () => setScreen('home'),
-          )}
-        </ScrollView>
-      )}
-
-      {screen === 'profile' && (
-        <ScrollView style={styles.body}>
-          <Text style={styles.title}>
-            {language === 'en' ? 'Customer Profile' : 'ग्राहक प्रोफाइल'}
-          </Text>
-
-          <Text style={styles.muted}>
-            {language === 'en'
-              ? 'Save your details once. They will be used automatically for future orders.'
-              : 'अपनी जानकारी एक बार सेव करें। आगे के ऑर्डर में यह अपने आप इस्तेमाल होगी।'}
-          </Text>
-
-          <Text style={styles.editLabel}>
-            {language === 'en' ? 'Customer Name' : 'ग्राहक का नाम'}
-          </Text>
+    {cancellationOrder ? (
+      <View style={styles.cancelOverlay}>
+        <View style={styles.cancelDialog}>
+          <Text style={styles.title}>{t('cancelReasonTitle')}</Text>
           <TextInput
-            value={profileName}
-            onChangeText={setProfileName}
-            placeholder={t('customerName')}
-            style={styles.input}
-          />
-
-          <Text style={styles.editLabel}>
-            {language === 'en' ? 'Mobile Number' : 'मोबाइल नंबर'}
-          </Text>
-          <TextInput
-            value={profilePhone}
-            onChangeText={value =>
-              setProfilePhone(value.replace(/\D/g, '').slice(0, 10))
-            }
-            placeholder={t('mobile')}
-            keyboardType="phone-pad"
-            maxLength={10}
-            style={styles.input}
-          />
-
-          <Text style={styles.editLabel}>
-            {language === 'en' ? 'Home Address' : 'घर का पूरा पता'}
-          </Text>
-          <TextInput
-            value={profileAddress}
-            onChangeText={setProfileAddress}
-            placeholder={t('fullAddress')}
-            multiline
-            style={[styles.input, styles.multilineInput]}
-          />
-
-          <Text style={styles.editLabel}>PIN Code</Text>
-          <TextInput
-            value={profilePinCode}
-            onChangeText={value =>
-              setProfilePinCode(value.replace(/\D/g, '').slice(0, 6))
-            }
-            placeholder={t('pinCode')}
-            keyboardType="number-pad"
-            maxLength={6}
-            style={styles.input}
-          />
-
-          {button(
-            language === 'en' ? 'Use Current Location' : 'मेरी मौजूदा लोकेशन लें',
-            async () => {
-              const location = await getCustomerLocation();
-              if (
-                location.customer_lat !== null &&
-                location.customer_lng !== null
-              ) {
-                Alert.alert(
-                  language === 'en' ? 'Location received' : 'लोकेशन मिल गई',
-                  language === 'en'
-                    ? 'Your location can be attached to your order.'
-                    : 'आपकी लोकेशन ऑर्डर के साथ भेजी जा सकेगी।',
-                );
-              }
-            },
-          )}
-
-          {button(
-            language === 'en' ? 'Save Profile' : 'प्रोफाइल सेव करें',
-            saveCustomerProfile,
-            true,
-          )}
-
-          <View style={styles.dividerLine} />
-
-          <Text style={styles.title}>
-            {language === 'en' ? 'Delivery Address' : 'डिलीवरी का पता'}
-          </Text>
-
-          <Text style={styles.muted}>
-            {language === 'en'
-              ? 'Use another address for a particular order if needed.'
-              : 'जरूरत पड़ने पर किसी ऑर्डर के लिए दूसरा पता इस्तेमाल करें।'}
-          </Text>
-
-          <TouchableOpacity
-            style={styles.alternateAddressToggle}
-            onPress={() => setUseAlternateAddress(value => !value)}>
-            <View style={[
-              styles.toggleSquare,
-              useAlternateAddress && styles.toggleSquareSelected,
-            ]}>
-              {useAlternateAddress ? (
-                <Text style={styles.toggleTick}>✓</Text>
-              ) : null}
-            </View>
-            <Text style={styles.item}>
-              {language === 'en'
-                ? 'Deliver to a different address'
-                : 'दूसरे पते पर डिलीवरी करें'}
-            </Text>
-          </TouchableOpacity>
-
-          {useAlternateAddress && (
-            <TextInput
-              value={deliveryAddress}
-              onChangeText={setDeliveryAddress}
-              placeholder={
-                language === 'en'
-                  ? 'Enter alternate delivery address'
-                  : 'दूसरा डिलीवरी पता लिखें'
-              }
-              multiline
-              style={[styles.input, styles.multilineInput]}
-            />
-          )}
-
-          <View style={styles.dividerLine} />
-
-          <Text style={styles.title}>
-            {language === 'en' ? 'Settings' : 'सेटिंग्स'}
-          </Text>
-
-          <Text style={styles.item}>
-            {t('language')} / Language
-          </Text>
-          <Text style={styles.muted}>{t('chooseLanguage')}</Text>
-
-          <TouchableOpacity
-            onPress={() => {
-              setLanguage('hi');
-              AsyncStorage.setItem(LANGUAGE_KEY, 'hi').catch(error =>
-                console.log('Language save error:', error),
-              );
-              Alert.alert('भाषा', translations.hi.savedLanguage);
-            }}
-            style={[
-              styles.languageOption,
-              language === 'hi' && styles.selectedLanguage,
-            ]}>
-            <Text style={styles.languageText}>हिन्दी</Text>
-            <Text style={styles.languageMark}>
-              {language === 'hi' ? '✓' : ''}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              setLanguage('en');
-              AsyncStorage.setItem(LANGUAGE_KEY, 'en').catch(error =>
-                console.log('Language save error:', error),
-              );
-              Alert.alert('Language', translations.en.savedLanguage);
-            }}
-            style={[
-              styles.languageOption,
-              language === 'en' && styles.selectedLanguage,
-            ]}>
-            <Text style={styles.languageText}>English</Text>
-            <Text style={styles.languageMark}>
-              {language === 'en' ? '✓' : ''}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.supportBox}>
-            <Text style={styles.supportTitle}>{t('helpSupport')}</Text>
-            {button(t('contactWhatsApp'), openWhatsApp, true)}
-            {button(t('callSupport'), callSupport)}
-            {button(t('emailSupport'), openSupportEmail)}
-            <Text style={styles.supportDetail}>{SUPPORT_EMAIL}</Text>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.item}>
-              {language === 'en' ? 'About RationSetu' : 'RationSetu के बारे में'}
-            </Text>
-            <Text style={styles.muted}>
-              {language === 'en'
-                ? 'RationSetu helps customers order grocery items for home delivery.'
-                : 'RationSetu ग्राहकों को घर पर सामान मंगाने की सुविधा देता है।'}
-            </Text>
-          </View>
-
-          {button(
-            language === 'en' ? 'Back to Home' : 'होम पर वापस जाएँ',
-            () => setScreen('home'),
-            true,
-          )}
-        </ScrollView>
-      )}
-
-      {screen === 'success' && (
-        <View style={styles.body}>
-          <Text style={styles.title}>✓ {t('orderSuccess')}</Text>
-          <Text style={styles.muted}>{t('orderSaved')}</Text>
-          {button(t('goHome'), () => setScreen('home'), true)}
-          {button(t('seeOrders'), () => setScreen('myorders'))}
-        </View>
-      )}
-
-      {screen === 'myorders' && (
-        <ScrollView style={styles.body}>
-          <Text style={styles.title}>{t('orderHistory')}</Text>
-          <Text style={styles.muted}>
-            {language === 'en'
-              ? 'Orders saved on this phone are shown below.'
-              : 'इस फोन में सेव हुए आपके पुराने और नए ऑर्डर यहाँ दिखेंगे।'}
-          </Text>
-
-          {data.orders.map(order => (
-            <View style={styles.card} key={order.id}>
-              <Text style={styles.item}>Order #{order.id}</Text>
-
-              <Text style={styles.statusText}>
-                {t('status')}: {statusLabel(order.status)}
-              </Text>
-
-              {order.cancellationReason ? (
-                <Text>
-                  {t('cancellationReason')}: {order.cancellationReason}
-                </Text>
-              ) : null}
-
-              <Text>{t('customer')}: {order.customer || '-'}</Text>
-              <Text>{t('mobile')}: {order.phone || '-'}</Text>
-              <Text>{t('address')}: {order.address || '-'}</Text>
-
-              {renderBillingBreakdown(order)}
-
-              <Text>{t('payment')}: {order.payment || 'COD'}</Text>
-              <Text style={styles.muted}>{order.createdAt || ''}</Text>
-
-              {Array.isArray(order.statusHistory) &&
-                order.statusHistory.length > 0 && (
-                  <View style={styles.historyBox}>
-                    <Text style={styles.editLabel}>
-                      {language === 'en' ? 'Order progress' : 'ऑर्डर की प्रगति'}
-                    </Text>
-
-                    {order.statusHistory.map((entry, index) => (
-                      <Text key={`${order.id}-history-${index}`}>
-                        • {statusLabel(entry.status || entry.new_status || '')}
-                        {entry.created_at || entry.createdAt
-                          ? ` — ${entry.created_at || entry.createdAt}`
-                          : ''}
-                      </Text>
-                    ))}
-                  </View>
-                )}
-
-              <View style={styles.actionRow}>
-                {button(t('refreshStatus'), () => refreshCustomerOrder(order))}
-
-                {!['Delivered', 'Cancelled'].includes(order.status) &&
-                  button(t('cancelOrder'), () => cancelCustomerOrder(order))}
-              </View>
-            </View>
-          ))}
-
-          {data.orders.length === 0 && (
-            <Text style={styles.muted}>{t('noOrderForPhone')}</Text>
-          )}
-
-          {button(t('goHome'), () => setScreen('home'), true)}
-        </ScrollView>
-      )}
-
-      {screen === 'adminLogin' && (
-        <ScrollView style={styles.body}>
-          <Text style={styles.title}>{t('adminLogin')}</Text>
-          {field(adminId, setAdminId, t('adminId'))}
-          {field(adminPassword, setAdminPassword, t('adminPassword'), 'default', true)}
-          {button(t('adminLogin'), adminLogin, true, loading)}
-          {button(t('goHome'), () => setScreen('home'))}
-        </ScrollView>
-      )}
-
-      {screen === 'admin' && (
-        <ScrollView style={styles.body}>
-          <Text style={styles.title}>{t('adminPanel')}</Text>
-
-          <View style={styles.adminSummary}>
-            <Text style={styles.item}>
-              {t('orderCount')}: {data.orders.length}
-            </Text>
-          </View>
-
-          {button(t('refreshOrders'), () => loadAdminOrders(), true, loading)}
-
-          <Text style={styles.title}>{t('adminOrders')}</Text>
-
-          {data.orders.map(order => (
-            <View style={styles.card} key={`admin-${order.id}`}>
-              <Text style={styles.item}>Order #{order.id}</Text>
-              <Text>{t('customer')}: {order.customer || '-'}</Text>
-              <Text>{t('mobile')}: {order.phone || '-'}</Text>
-              <Text>{t('address')}: {order.address || '-'}</Text>
-
-              {renderBillingBreakdown(order)}
-              <Text>{t('payment')}: {order.payment || 'COD'}</Text>
-
-              <Text style={styles.statusText}>
-                {t('status')}: {statusLabel(order.status)}
-              </Text>
-
-              {order.status === 'Cancelled' &&
-                order.cancellationReason &&
-                button(
-                  t('reasonView'),
-                  () => Alert.alert(t('cancellationReason'), order.cancellationReason),
-                )}
-
-              <Text style={styles.muted}>{order.createdAt || ''}</Text>
-
-              <View style={styles.actionRow}>
-                {button(t('accept'), () => updateOrderStatus(order.id, 'Accepted'), false, loading)}
-                {button(t('preparing'), () => updateOrderStatus(order.id, 'Preparing'), false, loading)}
-              </View>
-
-              <View style={styles.actionRow}>
-                {button(t('outForDelivery'), () => updateOrderStatus(order.id, 'Out for Delivery'), false, loading)}
-                {button(t('delivered'), () => updateOrderStatus(order.id, 'Delivered'), false, loading)}
-              </View>
-
-              {order.status !== 'Delivered' &&
-                order.status !== 'Cancelled' &&
-                button(t('cancel'), () => updateOrderStatus(order.id, 'Cancelled'), false, loading)}
-            </View>
-          ))}
-
-          {data.orders.length === 0 && (
-            <Text style={styles.muted}>{t('noOrders')}</Text>
-          )}
-
-          <Text style={styles.title}>{t('offers')}</Text>
-          <Text style={styles.editLabel}>
-            {editingOfferId ? t('editOffer') : t('addOffer')}
-          </Text>
-
-          {field(newOfferTitle, setNewOfferTitle, t('offerTitle'))}
-
-          <TextInput
-            value={newOfferDescription}
-            onChangeText={setNewOfferDescription}
-            placeholder={t('offerDescription')}
+            value={cancellationReason}
+            onChangeText={setCancellationReason}
+            placeholder={t('cancelReasonPlaceholder')}
             multiline
             textAlignVertical="top"
-            style={styles.input}
+            style={styles.cancelReasonInput}
+            placeholderTextColor="#8193a5"
           />
+          {button(t('submitCancellation'), submitCancellation, true, loading)}
+          {button(
+            language === 'en' ? 'Back' : 'वापस',
+            () => {
+              setCancellationOrder(null);
+              setCancellationReason('');
+            },
+            false,
+            loading,
+          )}
+        </View>
+      </View>
+    ) : null}
 
-          {newOfferImage?.uri ? (
-            <Image
-              source={{uri: newOfferImage.uri}}
-              style={styles.imagePreview}
-              resizeMode="cover"
-            />
-          ) : null}
+    {screen === 'home' && (
+      <ScrollView style={styles.body}>
+        <View style={styles.homeTopActions}>
+          <TouchableOpacity
+            style={styles.cartHeaderButton}
+            onPress={() => setScreen('cart')}>
+            <View style={styles.cartIconShape}>
+              <View style={styles.cartHandle} />
+              <View style={styles.cartBasket} />
+              <View style={styles.cartWheelRow}>
+                <View style={styles.cartWheel} />
+                <View style={styles.cartWheel} />
+              </View>
+            </View>
+            <Text style={styles.headerActionText}>
+              {language === 'en' ? 'Cart' : 'कार्ट'}
+            </Text>
+            {cartCount > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{cartCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-          {button(t('chooseOfferImage'), chooseOfferPhoto)}
-          {button(editingOfferId ? t('saveOffer') : t('addOffer'), saveOffer, true, loading)}
+          <TouchableOpacity
+            style={styles.profileHeaderButton}
+            onPress={() => setScreen('profile')}>
+            <Text style={styles.profileSymbol}>●</Text>
+            <Text style={styles.headerActionText}>
+              {language === 'en' ? 'Profile' : 'प्रोफाइल'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-          {editingOfferId
-            ? button(
-                language === 'en' ? 'Cancel edit' : 'एडिट रद्द करें',
-                () => {
-                  setEditingOfferId('');
-                  setNewOfferTitle('');
-                  setNewOfferDescription('');
-                  setNewOfferImage(null);
-                },
-              )
-            : null}
+        <Text style={styles.title}>{t('orderTitle')}</Text>
+        <Text style={styles.muted}>{t('serviceArea')}</Text>
 
-          {offers.map(offer => (
-            <View style={styles.card} key={`admin-offer-${offer.id}`}>
-              <Text style={styles.item}>{offer.title}</Text>
+        {apiError ? (
+          <Text style={styles.errorText}>{apiError}</Text>
+        ) : null}
+
+        {field(search, setSearch, t('search'))}
+
+        {offers
+          .filter(offer => offer.is_active === true)
+          .map(offer => (
+            <View style={styles.card} key={`customer-offer-${offer.id}`}>
+              <Text style={styles.title}>{offer.title}</Text>
 
               {offer.image_url ? (
                 <Image
@@ -2334,119 +1749,702 @@ export default function App() {
               {offer.description ? (
                 <Text style={styles.muted}>{offer.description}</Text>
               ) : null}
-
-              <Text style={styles.statusText}>
-                {offer.is_active
-                  ? (language === 'en' ? 'Active' : 'चालू')
-                  : (language === 'en' ? 'Inactive' : 'बंद')}
-              </Text>
-
-              <View style={styles.actionRow}>
-                {button(t('editOffer'), () => startEditOffer(offer))}
-                {button(
-                  offer.is_active ? t('deactivateOffer') : t('activateOffer'),
-                  () => toggleOffer(offer),
-                )}
-              </View>
             </View>
           ))}
 
-          <Text style={styles.title}>{t('productManagement')}</Text>
-          <Text style={styles.editLabel}>{t('addProductTitle')}</Text>
+        <View style={styles.productGrid}>
+          {items.map(product => (
+            <View key={product.id} style={styles.productGridCard}>
+              {product.image_url ? (
+                <Image
+                  source={{uri: product.image_url}}
+                  style={styles.productGridImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={styles.productGridImagePlaceholder}>
+                  <Text style={styles.item}>📦</Text>
+                </View>
+              )}
 
-          {field(newName, setNewName, t('productName'))}
-          {field(newPrice, setNewPrice, t('price'), 'decimal-pad')}
-          {field(newStock, setNewStock, t('stock'), 'number-pad')}
+              <Text style={styles.productGridName}>
+                {productLabel(product)}
+              </Text>
 
-          {newImage?.uri ? (
-            <Image
-              source={{uri: newImage.uri}}
-              style={styles.imagePreview}
-              resizeMode="cover"
-            />
-          ) : null}
+              <Text style={styles.productGridPrice}>
+                {money(product.price)} / {unitLabel(product.unit)}
+              </Text>
 
-          {button(t('choosePhoto'), selectNewProductImage)}
-          {button(t('addProduct'), addProduct, true, loading)}
+              <Text style={styles.productGridStock}>
+                {t('available')}: {product.stock}
+              </Text>
 
-          <Text style={styles.title}>{t('editPriceStock')}</Text>
+              <View style={styles.productGridQty}>
+                {button('−', () => changeQuantity(product.id, -1))}
+                <Text style={styles.item}>
+                  {cart[product.id] || 0}
+                </Text>
+                {button('+', () => changeQuantity(product.id, 1))}
+              </View>
+            </View>
+          ))}
+        </View>
 
-          {data.products.map(product => {
-            const draft = editingProducts[product.id] || {};
+        {items.length === 0 && (
+          <Text style={styles.muted}>{t('noProduct')}</Text>
+        )}
+
+        <View style={styles.total}>
+          <Text style={styles.item}>
+            {t('total')}: {money(total)}
+          </Text>
+          <Text style={styles.muted}>{t('paymentCod')}</Text>
+        </View>
+
+        {button(
+          language === 'en'
+            ? `View Cart (${cartCount})`
+            : `कार्ट देखें (${cartCount})`,
+          () => setScreen('cart'),
+          true,
+        )}
+      </ScrollView>
+    )}
+
+    {screen === 'cart' && (
+      <ScrollView style={styles.body}>
+        <Text style={styles.title}>
+          {language === 'en' ? 'My Cart' : 'मेरा कार्ट'}
+        </Text>
+
+        {Object.entries(cart)
+          .filter(([id, quantity]) =>
+            quantity > 0 &&
+            data.products.some(product => product.id === id),
+          )
+          .map(([id, quantity]) => {
+            const product = data.products.find(item => item.id === id);
+            const lineTotal = Number(product.price || 0) * quantity;
 
             return (
-              <View style={styles.card} key={`product-${product.id}`}>
-                <View style={styles.productAdminRow}>
+              <View style={styles.cartItemCard} key={`cart-${id}`}>
+                <View style={styles.cartItemDetails}>
                   {product.image_url ? (
                     <Image
                       source={{uri: product.image_url}}
-                      style={styles.productImage}
+                      style={styles.cartItemImage}
                       resizeMode="cover"
                     />
-                  ) : (
-                    <View style={styles.productImagePlaceholder}>
-                      <Text>📦</Text>
-                    </View>
-                  )}
+                  ) : null}
 
-                  <View style={styles.productAdminInfo}>
-                    <Text style={styles.item}>{product.name}</Text>
+                  <View style={styles.cartItemText}>
+                    <Text style={styles.item}>
+                      {productLabel(product)}
+                    </Text>
                     <Text style={styles.muted}>
-                      {money(product.price)} · {product.stock} {t('available')}
+                      {money(product.price)} / {unitLabel(product.unit)}
+                    </Text>
+                    <Text style={styles.cartLineTotal}>
+                      {language === 'en' ? 'Amount' : 'रकम'}: {money(lineTotal)}
                     </Text>
                   </View>
                 </View>
 
-                <TextInput
-                  value={String(draft.price ?? product.price)}
-                  onChangeText={value =>
-                    setEditingProducts(previous => ({
-                      ...previous,
-                      [product.id]: {
-                        ...previous[product.id],
-                        price: value,
-                      },
-                    }))
-                  }
-                  placeholder={t('price')}
-                  keyboardType="decimal-pad"
-                  style={styles.input}
-                />
+                <View style={styles.cartControls}>
+                  <TouchableOpacity
+                    style={styles.cartQtyButton}
+                    onPress={() => changeQuantity(id, -1)}>
+                    <Text style={styles.cartQtyButtonText}>−</Text>
+                  </TouchableOpacity>
 
-                <TextInput
-                  value={String(draft.stock ?? product.stock)}
-                  onChangeText={value =>
-                    setEditingProducts(previous => ({
-                      ...previous,
-                      [product.id]: {
-                        ...previous[product.id],
-                        stock: value,
-                      },
-                    }))
-                  }
-                  placeholder={t('stock')}
-                  keyboardType="number-pad"
-                  style={styles.input}
-                />
+                  <Text style={styles.cartQtyNumber}>{quantity}</Text>
 
-                {button(t('saveChanges'), () => saveProductPriceStock(product), true, loading)}
+                  <TouchableOpacity
+                    style={styles.cartQtyButton}
+                    onPress={() => changeQuantity(id, 1)}>
+                    <Text style={styles.cartQtyButtonText}>+</Text>
+                  </TouchableOpacity>
 
-                {button(
-                  uploadingPhotoId === product.id ? t('wait') : t('replacePhoto'),
-                  () => replaceProductImage(product),
-                  false,
-                  Boolean(uploadingPhotoId) || loading,
-                )}
+                  <TouchableOpacity
+                    style={styles.removeCartButton}
+                    onPress={() => removeCartItem(id)}>
+                    <Text style={styles.removeCartText}>
+                      {language === 'en' ? 'Remove' : 'हटाएँ'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })}
 
-          {button(t('logout'), logoutAdmin)}
-        </ScrollView>
-      )}
-    </SafeAreaView>
-  );
-} const styles = StyleSheet.create({
+        {cartCount === 0 && (
+          <View style={styles.card}>
+            <Text style={styles.item}>
+              {language === 'en' ? 'Your cart is empty.' : 'आपका कार्ट खाली है।'}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.total}>
+          <Text style={styles.item}>
+            {language === 'en' ? 'Cart Total' : 'कार्ट का कुल'}: {money(total)}
+          </Text>
+          <Text style={styles.muted}>{t('paymentCod')}</Text>
+        </View>
+
+        {cartCount > 0 && (
+          <>
+            <Text style={styles.title}>
+              {language === 'en' ? 'Delivery Details' : 'डिलीवरी की जानकारी'}
+            </Text>
+
+            <Text style={styles.muted}>
+              {language === 'en'
+                ? 'Your saved Profile details will be used for this order.'
+                : 'इस ऑर्डर के लिए आपकी प्रोफाइल में सेव जानकारी इस्तेमाल होगी।'}
+            </Text>
+
+            <View style={styles.card}>
+              <Text style={styles.item}>{profileName || '-'}</Text>
+              <Text>{profilePhone || '-'}</Text>
+              <Text>{profileAddress || '-'}</Text>
+              <Text>
+                {language === 'en' ? 'PIN Code' : 'पिन कोड'}: {profilePinCode || '-'}
+              </Text>
+            </View>
+
+            {button(
+              language === 'en' ? 'Edit Profile' : 'प्रोफाइल बदलें',
+              () => setScreen('profile'),
+            )}
+
+            {button(
+              language === 'en' ? 'Place COD Order' : 'कैश ऑन डिलीवरी ऑर्डर करें',
+              placeOrder,
+              true,
+              loading,
+            )}
+          </>
+        )}
+
+        {button(
+          language === 'en' ? 'Continue Shopping' : 'खरीदारी जारी रखें',
+          () => setScreen('home'),
+        )}
+      </ScrollView>
+    )}
+
+    {screen === 'profile' && (
+      <ScrollView style={styles.body}>
+        <Text style={styles.title}>
+          {language === 'en' ? 'Customer Profile' : 'ग्राहक प्रोफाइल'}
+        </Text>
+
+        <Text style={styles.muted}>
+          {language === 'en'
+            ? 'Save your details once. They will be used automatically for future orders.'
+            : 'अपनी जानकारी एक बार सेव करें। आगे के ऑर्डर में यह अपने आप इस्तेमाल होगी।'}
+        </Text>
+
+        <Text style={styles.editLabel}>
+          {language === 'en' ? 'Customer Name' : 'ग्राहक का नाम'}
+        </Text>
+        <TextInput
+          value={profileName}
+          onChangeText={setProfileName}
+          placeholder={t('customerName')}
+          style={styles.input}
+        />
+
+        <Text style={styles.editLabel}>
+          {language === 'en' ? 'Mobile Number' : 'मोबाइल नंबर'}
+        </Text>
+        <TextInput
+          value={profilePhone}
+          onChangeText={value =>
+            setProfilePhone(value.replace(/\D/g, '').slice(0, 10))
+          }
+          placeholder={t('mobile')}
+          keyboardType="phone-pad"
+          maxLength={10}
+          style={styles.input}
+        />
+
+        <Text style={styles.editLabel}>
+          {language === 'en' ? 'Home Address' : 'घर का पूरा पता'}
+        </Text>
+        <TextInput
+          value={profileAddress}
+          onChangeText={setProfileAddress}
+          placeholder={t('fullAddress')}
+          multiline
+          style={[styles.input, styles.multilineInput]}
+        />
+
+        <Text style={styles.editLabel}>PIN Code</Text>
+        <TextInput
+          value={profilePinCode}
+          onChangeText={value =>
+            setProfilePinCode(value.replace(/\D/g, '').slice(0, 6))
+          }
+          placeholder={t('pinCode')}
+          keyboardType="number-pad"
+          maxLength={6}
+          style={styles.input}
+        />
+
+        {button(
+          language === 'en' ? 'Use Current Location' : 'मेरी मौजूदा लोकेशन लें',
+          async () => {
+            const location = await getCustomerLocation();
+            if (
+              location.customer_lat !== null &&
+              location.customer_lng !== null
+            ) {
+              Alert.alert(
+                language === 'en' ? 'Location received' : 'लोकेशन मिल गई',
+                language === 'en'
+                  ? 'Your location can be attached to your order.'
+                  : 'आपकी लोकेशन ऑर्डर के साथ भेजी जा सकेगी।',
+              );
+            }
+          },
+        )}
+
+        {button(
+          language === 'en' ? 'Save Profile' : 'प्रोफाइल सेव करें',
+          saveCustomerProfile,
+          true,
+        )}
+
+        <View style={styles.dividerLine} />
+
+        <Text style={styles.title}>
+          {language === 'en' ? 'Delivery Address' : 'डिलीवरी का पता'}
+        </Text>
+
+        <Text style={styles.muted}>
+          {language === 'en'
+            ? 'Use another address for a particular order if needed.'
+            : 'जरूरत पड़ने पर किसी ऑर्डर के लिए दूसरा पता इस्तेमाल करें।'}
+        </Text>
+
+        <TouchableOpacity
+          style={styles.alternateAddressToggle}
+          onPress={() => setUseAlternateAddress(value => !value)}>
+          <View style={[
+            styles.toggleSquare,
+            useAlternateAddress && styles.toggleSquareSelected,
+          ]}>
+            {useAlternateAddress ? (
+              <Text style={styles.toggleTick}>✓</Text>
+            ) : null}
+          </View>
+          <Text style={styles.item}>
+            {language === 'en'
+              ? 'Deliver to a different address'
+              : 'दूसरे पते पर डिलीवरी करें'}
+          </Text>
+        </TouchableOpacity>
+
+        {useAlternateAddress && (
+          <TextInput
+            value={deliveryAddress}
+            onChangeText={setDeliveryAddress}
+            placeholder={
+              language === 'en'
+                ? 'Enter alternate delivery address'
+                : 'दूसरा डिलीवरी पता लिखें'
+            }
+            multiline
+            style={[styles.input, styles.multilineInput]}
+          />
+        )}
+
+        <View style={styles.dividerLine} />
+
+        <Text style={styles.title}>
+          {language === 'en' ? 'Settings' : 'सेटिंग्स'}
+        </Text>
+
+        <Text style={styles.item}>
+          {t('language')} / Language
+        </Text>
+        <Text style={styles.muted}>{t('chooseLanguage')}</Text>
+
+        <TouchableOpacity
+          onPress={() => {
+            setLanguage('hi');
+            AsyncStorage.setItem(LANGUAGE_KEY, 'hi').catch(error =>
+              console.log('Language save error:', error),
+            );
+            Alert.alert('भाषा', translations.hi.savedLanguage);
+          }}
+          style={[
+            styles.languageOption,
+            language === 'hi' && styles.selectedLanguage,
+          ]}>
+          <Text style={styles.languageText}>हिन्दी</Text>
+          <Text style={styles.languageMark}>
+            {language === 'hi' ? '✓' : ''}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => {
+            setLanguage('en');
+            AsyncStorage.setItem(LANGUAGE_KEY, 'en').catch(error =>
+              console.log('Language save error:', error),
+            );
+            Alert.alert('Language', translations.en.savedLanguage);
+          }}
+          style={[
+            styles.languageOption,
+            language === 'en' && styles.selectedLanguage,
+          ]}>
+          <Text style={styles.languageText}>English</Text>
+          <Text style={styles.languageMark}>
+            {language === 'en' ? '✓' : ''}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.supportBox}>
+          <Text style={styles.supportTitle}>{t('helpSupport')}</Text>
+          {button(t('contactWhatsApp'), openWhatsApp, true)}
+          {button(t('callSupport'), callSupport)}
+          {button(t('emailSupport'), openSupportEmail)}
+          <Text style={styles.supportDetail}>{SUPPORT_EMAIL}</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.item}>
+            {language === 'en' ? 'About RationSetu' : 'RationSetu के बारे में'}
+          </Text>
+          <Text style={styles.muted}>
+            {language === 'en'
+              ? 'RationSetu helps customers order grocery items for home delivery.'
+              : 'RationSetu ग्राहकों को घर पर सामान मंगाने की सुविधा देता है।'}
+          </Text>
+        </View>
+
+        {button(
+          language === 'en' ? 'Back to Home' : 'होम पर वापस जाएँ',
+          () => setScreen('home'),
+          true,
+        )}
+      </ScrollView>
+    )}
+
+    {screen === 'success' && (
+      <View style={styles.body}>
+        <Text style={styles.title}>✓ {t('orderSuccess')}</Text>
+        <Text style={styles.muted}>{t('orderSaved')}</Text>
+        {button(t('goHome'), () => setScreen('home'), true)}
+        {button(t('seeOrders'), () => setScreen('myorders'))}
+      </View>
+    )}
+
+    {screen === 'myorders' && (
+      <ScrollView style={styles.body}>
+        <Text style={styles.title}>{t('orderHistory')}</Text>
+        <Text style={styles.muted}>
+          {language === 'en'
+            ? 'Orders saved on this phone are shown below.'
+            : 'इस फोन में सेव हुए आपके पुराने और नए ऑर्डर यहाँ दिखेंगे।'}
+        </Text>
+
+        {data.orders.map(order => (
+          <View style={styles.card} key={order.id}>
+            <Text style={styles.item}>Order #{order.id}</Text>
+
+            <Text style={styles.statusText}>
+              {t('status')}: {statusLabel(order.status)}
+            </Text>
+
+            {order.cancellationReason ? (
+              <Text>
+                {t('cancellationReason')}: {order.cancellationReason}
+              </Text>
+            ) : null}
+
+            <Text>{t('customer')}: {order.customer || '-'}</Text>
+            <Text>{t('mobile')}: {order.phone || '-'}</Text>
+            <Text>{t('address')}: {order.address || '-'}</Text>
+
+            {renderBillingBreakdown(order)}
+
+            <Text>{t('payment')}: {order.payment || 'COD'}</Text>
+            <Text style={styles.muted}>{order.createdAt || ''}</Text>
+
+            {Array.isArray(order.statusHistory) &&
+              order.statusHistory.length > 0 && (
+                <View style={styles.historyBox}>
+                  <Text style={styles.editLabel}>
+                    {language === 'en' ? 'Order progress' : 'ऑर्डर की प्रगति'}
+                  </Text>
+
+                  {order.statusHistory.map((entry, index) => (
+                    <Text key={`${order.id}-history-${index}`}>
+                      • {statusLabel(entry.status || entry.new_status || '')}
+                      {entry.created_at || entry.createdAt
+                        ? ` — ${entry.created_at || entry.createdAt}`
+                        : ''}
+                    </Text>
+                  ))}
+                </View>
+              )}
+
+            <View style={styles.actionRow}>
+              {button(t('refreshStatus'), () => refreshCustomerOrder(order))}
+
+              {!['Delivered', 'Cancelled'].includes(order.status) &&
+                button(t('cancelOrder'), () => cancelCustomerOrder(order))}
+            </View>
+          </View>
+        ))}
+
+        {data.orders.length === 0 && (
+          <Text style={styles.muted}>{t('noOrderForPhone')}</Text>
+        )}
+
+        {button(t('goHome'), () => setScreen('home'), true)}
+      </ScrollView>
+    )} {screen === 'adminLogin' && (
+  <ScrollView style={styles.body}>
+    <Text style={styles.title}>{t('adminLogin')}</Text>
+    {field(adminId, setAdminId, t('adminId'))}
+    {field(adminPassword, setAdminPassword, t('adminPassword'), 'default', true)}
+    {button(t('adminLogin'), adminLogin, true, loading)}
+    {button(t('goHome'), () => setScreen('home'))}
+  </ScrollView>
+)}
+
+{screen === 'admin' && (
+  <ScrollView style={styles.body}>
+    <Text style={styles.title}>{t('adminPanel')}</Text>
+
+    <View style={styles.adminSummary}>
+      <Text style={styles.item}>
+        {t('orderCount')}: {data.orders.length}
+      </Text>
+    </View>
+
+    {button(t('refreshOrders'), () => loadAdminOrders(), true, loading)}
+
+    <Text style={styles.title}>{t('adminOrders')}</Text>
+
+    {data.orders.map(order => (
+      <View style={styles.card} key={`admin-${order.id}`}>
+        <Text style={styles.item}>Order #{order.id}</Text>
+        <Text>{t('customer')}: {order.customer || '-'}</Text>
+        <Text>{t('mobile')}: {order.phone || '-'}</Text>
+        <Text>{t('address')}: {order.address || '-'}</Text>
+
+        {renderBillingBreakdown(order)}
+        <Text>{t('payment')}: {order.payment || 'COD'}</Text>
+
+        <Text style={styles.statusText}>
+          {t('status')}: {statusLabel(order.status)}
+        </Text>
+
+        {order.status === 'Cancelled' &&
+          order.cancellationReason &&
+          button(
+            t('reasonView'),
+            () => Alert.alert(t('cancellationReason'), order.cancellationReason),
+          )}
+
+        <Text style={styles.muted}>{order.createdAt || ''}</Text>
+
+        <View style={styles.actionRow}>
+          {button(t('accept'), () => updateOrderStatus(order.id, 'Accepted'), false, loading)}
+          {button(t('preparing'), () => updateOrderStatus(order.id, 'Preparing'), false, loading)}
+        </View>
+
+        <View style={styles.actionRow}>
+          {button(t('outForDelivery'), () => updateOrderStatus(order.id, 'Out for Delivery'), false, loading)}
+          {button(t('delivered'), () => updateOrderStatus(order.id, 'Delivered'), false, loading)}
+        </View>
+
+        {order.status !== 'Delivered' &&
+          order.status !== 'Cancelled' &&
+          button(t('cancel'), () => updateOrderStatus(order.id, 'Cancelled'), false, loading)}
+      </View>
+    ))}
+
+    {data.orders.length === 0 && (
+      <Text style={styles.muted}>{t('noOrders')}</Text>
+    )}
+
+    <Text style={styles.title}>{t('offers')}</Text>
+    <Text style={styles.editLabel}>
+      {editingOfferId ? t('editOffer') : t('addOffer')}
+    </Text>
+
+    {field(newOfferTitle, setNewOfferTitle, t('offerTitle'))}
+
+    <TextInput
+      value={newOfferDescription}
+      onChangeText={setNewOfferDescription}
+      placeholder={t('offerDescription')}
+      multiline
+      textAlignVertical="top"
+      style={styles.input}
+    />
+
+    {newOfferImage?.uri ? (
+      <Image
+        source={{uri: newOfferImage.uri}}
+        style={styles.imagePreview}
+        resizeMode="cover"
+      />
+    ) : null}
+
+    {button(t('chooseOfferImage'), chooseOfferPhoto)}
+    {button(editingOfferId ? t('saveOffer') : t('addOffer'), saveOffer, true, loading)}
+
+    {editingOfferId
+      ? button(
+          language === 'en' ? 'Cancel edit' : 'एडिट रद्द करें',
+          () => {
+            setEditingOfferId('');
+            setNewOfferTitle('');
+            setNewOfferDescription('');
+            setNewOfferImage(null);
+          },
+        )
+      : null}
+
+    {offers.map(offer => (
+      <View style={styles.card} key={`admin-offer-${offer.id}`}>
+        <Text style={styles.item}>{offer.title}</Text>
+
+        {offer.image_url ? (
+          <Image
+            source={{uri: offer.image_url}}
+            style={styles.offerImage}
+            resizeMode="cover"
+          />
+        ) : null}
+
+        {offer.description ? (
+          <Text style={styles.muted}>{offer.description}</Text>
+        ) : null}
+
+        <Text style={styles.statusText}>
+          {offer.is_active
+            ? (language === 'en' ? 'Active' : 'चालू')
+            : (language === 'en' ? 'Inactive' : 'बंद')}
+        </Text>
+
+        <View style={styles.actionRow}>
+          {button(t('editOffer'), () => startEditOffer(offer))}
+          {button(
+            offer.is_active ? t('deactivateOffer') : t('activateOffer'),
+            () => toggleOffer(offer),
+          )}
+        </View>
+      </View>
+    ))}
+
+    <Text style={styles.title}>{t('productManagement')}</Text>
+    <Text style={styles.editLabel}>{t('addProductTitle')}</Text>
+
+    {field(newName, setNewName, t('productName'))}
+    {field(newPrice, setNewPrice, t('price'), 'decimal-pad')}
+    {field(newStock, setNewStock, t('stock'), 'number-pad')}
+
+    {newImage?.uri ? (
+      <Image
+        source={{uri: newImage.uri}}
+        style={styles.imagePreview}
+        resizeMode="cover"
+      />
+    ) : null}
+
+    {button(t('choosePhoto'), selectNewProductImage)}
+    {button(t('addProduct'), addProduct, true, loading)}
+
+    <Text style={styles.title}>{t('editPriceStock')}</Text>
+
+    {data.products.map(product => {
+      const draft = editingProducts[product.id] || {};
+
+      return (
+        <View style={styles.card} key={`product-${product.id}`}>
+          <View style={styles.productAdminRow}>
+            {product.image_url ? (
+              <Image
+                source={{uri: product.image_url}}
+                style={styles.productImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.productImagePlaceholder}>
+                <Text>📦</Text>
+              </View>
+            )}
+
+            <View style={styles.productAdminInfo}>
+              <Text style={styles.item}>{product.name}</Text>
+              <Text style={styles.muted}>
+                {money(product.price)} · {product.stock} {t('available')}
+              </Text>
+            </View>
+          </View>
+
+          <TextInput
+            value={String(draft.price ?? product.price)}
+            onChangeText={value =>
+              setEditingProducts(previous => ({
+                ...previous,
+                [product.id]: {
+                  ...previous[product.id],
+                  price: value,
+                },
+              }))
+            }
+            placeholder={t('price')}
+            keyboardType="decimal-pad"
+            style={styles.input}
+          />
+
+          <TextInput
+            value={String(draft.stock ?? product.stock)}
+            onChangeText={value =>
+              setEditingProducts(previous => ({
+                ...previous,
+                [product.id]: {
+                  ...previous[product.id],
+                  stock: value,
+                },
+              }))
+            }
+            placeholder={t('stock')}
+            keyboardType="number-pad"
+            style={styles.input}
+          />
+
+          {button(t('saveChanges'), () => saveProductPriceStock(product), true, loading)}
+
+          {button(
+            uploadingPhotoId === product.id ? t('wait') : t('replacePhoto'),
+            () => replaceProductImage(product),
+            false,
+            Boolean(uploadingPhotoId) || loading,
+          )}
+        </View>
+      );
+    })}
+
+    {button(t('logout'), logoutAdmin)}
+  </ScrollView>
+)}
+</SafeAreaView>
+);
+}
+
+const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#f3f7fc',
@@ -2949,4 +2947,3 @@ export default function App() {
     marginTop: 8,
   },
 });
-
