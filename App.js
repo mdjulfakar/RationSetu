@@ -2577,9 +2577,7 @@ headerBrandCenter: {
   justifyContent: 'center',
   paddingHorizontal: 3,
 },
-
-  },
-  brand: {
+ brand: {
     color: '#fff',
     fontSize: 32,
     fontWeight: 'bold',
@@ -2637,18 +2635,18 @@ headerBrandCenter: {
     alignItems: 'center',
     marginBottom: 8,
   },
-  cartHeaderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#d4e1ed',
-    borderRadius: 10,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-    minWidth: 110,
-  },
-  cartIconShape: {
+ cartHeaderButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#fff',
+  borderWidth: 1,
+  borderColor: '#d4e1ed',
+  borderRadius: 9,
+  paddingHorizontal: 7,
+  paddingVertical: 7,
+  minWidth: 0,
+},
+cartIconShape: {
     width: 28,
     height: 25,
     marginRight: 8,
