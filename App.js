@@ -1739,10 +1739,7 @@ return (
       <View style={styles.nav}>
         {button(t('home'), () => setScreen('home'))}
         {button(t('myOrders'), () => setScreen('myorders'))}
-        {button(
-          language === 'en' ? 'Admin' : 'एडमिन',
-          () => setScreen('adminLogin'),
-        )}
+        
       </View>
     )}
 
@@ -1775,37 +1772,6 @@ return (
 
     {screen === 'home' && (
       <ScrollView style={styles.body}>
-        <View style={styles.homeTopActions}>
-          <TouchableOpacity
-            style={styles.cartHeaderButton}
-            onPress={() => setScreen('cart')}>
-            <View style={styles.cartIconShape}>
-              <View style={styles.cartHandle} />
-              <View style={styles.cartBasket} />
-              <View style={styles.cartWheelRow}>
-                <View style={styles.cartWheel} />
-                <View style={styles.cartWheel} />
-              </View>
-            </View>
-            <Text style={styles.headerActionText}>
-              {language === 'en' ? 'Cart' : 'कार्ट'}
-            </Text>
-            {cartCount > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{cartCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.profileHeaderButton}
-            onPress={() => setScreen('profile')}>
-            <Text style={styles.profileSymbol}>●</Text>
-            <Text style={styles.headerActionText}>
-              {language === 'en' ? 'Profile' : 'प्रोफाइल'}
-            </Text>
-          </TouchableOpacity>
-        </View>
 
         <Text style={styles.title}>{t('orderTitle')}</Text>
         <Text style={styles.muted}>{t('serviceArea')}</Text>
