@@ -687,17 +687,58 @@ export default function App() {
     />
   );
 
+
   const header = (
     <View style={styles.header}>
-      <Text style={styles.brand}>RationSetu</Text>
-      <Text style={styles.sub}>{t('tagline')}</Text>
+      {screen === 'home' ? (
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.cartHeaderButton}
+            onPress={() => setScreen('cart')}>
+            <View style={styles.cartIconShape}>
+              <View style={styles.cartHandle} />
+              <View style={styles.cartBasket} />
+              <View style={styles.cartWheelRow}>
+                <View style={styles.cartWheel} />
+                <View style={styles.cartWheel} />
+              </View>
+            </View>
+            <Text style={styles.headerActionText}>
+              {language === 'en' ? 'Cart' : 'कार्ट'}
+            </Text>
+            {cartCount > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{cartCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.headerBrandCenter}>
+            <Text style={styles.brand}>RationSetu</Text>
+            <Text style={styles.sub}>{t('tagline')}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.profileHeaderButton}
+            onPress={() => setScreen('profile')}>
+            <Text style={styles.profileSymbol}>●</Text>
+            <Text style={styles.headerActionText}>
+              {language === 'en' ? 'Profile' : 'प्रोफाइल'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          <Text style={styles.brand}>RationSetu</Text>
+          <Text style={styles.sub}>{t('tagline')}</Text>
+        </>
+      )}
       <Text style={styles.connection}>
         {isOnline ? t('online') : t('offline')}
       </Text>
     </View>
   );
-
-  function changeQuantity(id, difference) {
+ function changeQuantity(id, difference) {
     const product = data.products.find(item => item.id === id);
     if (!product) return;
 
@@ -2517,12 +2558,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f7fc',
   },
-  header: {
-    backgroundColor: '#1769aa',
-    minHeight: 150,
-    paddingHorizontal: 22,
-    paddingVertical: 22,
-    justifyContent: 'center',
+  
+header: {
+  backgroundColor: '#1769aa',
+  minHeight: 112,
+  paddingHorizontal: 10,
+  paddingVertical: 9,
+  justifyContent: 'center',
+},
+headerTopRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+},
+headerBrandCenter: {
+  flex: 1,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 3,
+},
+
   },
   brand: {
     color: '#fff',
