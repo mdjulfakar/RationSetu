@@ -1018,7 +1018,50 @@ export default function App() {
       setLoading(true);
 
       try {
-        const customerLocation = await getCustomerLocation();
+        
+let customerLocation;
+
+if (useAlternateAddress) {
+  customerLocation = await getCustomerLocation();
+} else {
+  const cleanPhone = customerPhone.replace(/\D/g, '');
+  const cleanAddress = customerAddress.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const homeLocationKey =
+    `rationsetu_customer_home_location_v1:${cleanPhone}:${cleanAddress}`;
+
+  const savedLocationText = await AsyncStorage.getItem(homeLocationKey);
+  let savedLocation = null;
+
+  if (savedLocationText) {
+    try {
+      savedLocation = JSON.parse(savedLocationText);
+    } catch (error) {
+      savedLocation = null;
+    }
+  }
+
+  if (
+    savedLocation &&
+    Number.isFinite(Number(savedLocation.customer_lat)) &&
+    Number.isFinite(Number(savedLocation.customer_lng)) &&
+    savedLocation.customer_lat !== null &&
+    savedLocation.customer_lng !== null
+  ) {
+    customerLocation = {
+      customer_lat: Number(savedLocation.customer_lat),
+      customer_lng: Number(savedLocation.customer_lng),
+    };
+  } else {
+    customerLocation = await getCustomerLocation();
+
+    await AsyncStorage.setItem(
+      homeLocationKey,
+      JSON.stringify(customerLocation),
+    );
+  }
+}
+
 
         const result = await apiRequest('/api/orders', {
           method: 'POST',
@@ -1993,23 +2036,47 @@ return (
           style={styles.input}
         />
 
-        {button(
-          language === 'en' ? 'Use Current Location' : 'मेरी मौजूदा लोकेशन लें',
-          async () => {
-            const location = await getCustomerLocation();
-            if (
-              location.customer_lat !== null &&
-              location.customer_lng !== null
-            ) {
-              Alert.alert(
-                language === 'en' ? 'Location received' : 'लोकेशन मिल गई',
-                language === 'en'
-                  ? 'Your location can be attached to your order.'
-                  : 'आपकी लोकेशन ऑर्डर के साथ भेजी जा सकेगी।',
-              );
-            }
-          },
-        )}
+       {button(
+  language === 'en' ? 'Use Current Location' : 'मेरी मौजूदा लोकेशन लें',
+  async () => {
+    try {
+      const cleanPhone = profilePhone.replace(/\D/g, '');
+      const cleanAddress = profileAddress.trim().toLowerCase().replace(/\s+/g, ' ');
+
+      if (!/^[0-9]{10}$/.test(cleanPhone) || !cleanAddress) {
+        Alert.alert(
+          language === 'en' ? 'Profile Required' : 'प्रोफाइल जरूरी है',
+          language === 'en'
+            ? 'Enter your 10-digit mobile number and home address first.'
+            : 'पहले अपना 10 अंकों का मोबाइल नंबर और घर का पता भरें।',
+        );
+        return;
+      }
+
+      const location = await getCustomerLocation();
+
+      const homeLocationKey =
+        `rationsetu_customer_home_location_v1:${cleanPhone}:${cleanAddress}`;
+
+      await AsyncStorage.setItem(
+        homeLocationKey,
+        JSON.stringify(location),
+      );
+
+      Alert.alert(
+        language === 'en' ? 'Location Saved' : 'लोकेशन सेव हो गई',
+        language === 'en'
+          ? 'Your home location has been saved for future orders.'
+          : 'आपके घर की लोकेशन अगले ऑर्डर के लिए सेव हो गई है।',
+      );
+    } catch (error) {
+      Alert.alert(
+        language === 'en' ? 'Location Error' : 'लोकेशन की समस्या',
+        error.message,
+      );
+    }
+  },
+)}                 
 
         {button(
           language === 'en' ? 'Save Profile' : 'प्रोफाइल सेव करें',
