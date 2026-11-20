@@ -2275,7 +2275,8 @@ return (
         )}
 
         {button(t('goHome'), () => setScreen('home'), true)}
-     )} </ScrollView>
+           </ScrollView>
+    )}
     {screen === 'adminLogin' && (
   <ScrollView style={styles.body}>
     <Text style={styles.title}>{t('adminLogin')}</Text>
