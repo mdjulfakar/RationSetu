@@ -1,3 +1,4 @@
+
 import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
@@ -20,6 +21,8 @@ import * as Location from 'expo-location';
 const API_BASE_URL = 'https://rationsetu-service.onrender.com';
 const KEY = 'rationsetu_v1';
 const LANGUAGE_KEY = 'rationsetu_language';
+const PROFILE_KEY = 'rationsetu_customer_profile_v1';
+const CART_KEY = 'rationsetu_cart_v1';
 const PRESENCE_CLIENT_KEY = 'rationsetu_presence_client_id';
 const HEARTBEAT_INTERVAL = 30000;
 
@@ -44,6 +47,8 @@ const translations = {
     myOrders: 'मेरे ऑर्डर',
     shopAdmin: 'दुकान एडमिन',
     settings: 'सेटिंग्स',
+    profile: 'ग्राहक प्रोफाइल',
+    cart: 'मेरा कार्ट',
     language: 'भाषा',
     chooseLanguage: 'अपनी पसंद की भाषा चुनें',
     savedLanguage: 'भाषा सेव हो गई।',
@@ -165,6 +170,19 @@ const translations = {
     adminOrders: 'ऑर्डर मैनेजमेंट',
     productManagement: 'सामान मैनेजमेंट',
     emailOpenError: 'ईमेल ऐप नहीं खुल पाया।',
+    saveProfile: 'प्रोफाइल सेव करें',
+    profileSaved: 'आपकी प्रोफाइल सेव हो गई।',
+    editProfile: 'प्रोफाइल बदलें',
+    deliveryAddress: 'डिलीवरी का पता',
+    useHomeAddress: 'घर का पता इस्तेमाल करें',
+    alternateAddress: 'दूसरा डिलीवरी पता',
+    emptyCart: 'आपका कार्ट खाली है।',
+    continueShopping: 'सामान खरीदें',
+    removeItem: 'हटाएँ',
+    subtotal: 'सामान का कुल',
+    checkout: 'ऑर्डर आगे बढ़ाएँ',
+    cartSaved: 'कार्ट फोन में सुरक्षित सेव रहता है।',
+    profileRequired: 'ऑर्डर से पहले प्रोफाइल में नाम, मोबाइल और पता सेव करें।',
   },
   en: {
     tagline: 'Your groceries, delivered to your home!',
@@ -174,6 +192,8 @@ const translations = {
     myOrders: 'My Orders',
     shopAdmin: 'Shop Admin',
     settings: 'Settings',
+    profile: 'Customer Profile',
+    cart: 'My Cart',
     language: 'Language',
     chooseLanguage: 'Choose your preferred language',
     savedLanguage: 'Language preference saved.',
@@ -295,6 +315,19 @@ const translations = {
     adminOrders: 'Order Management',
     productManagement: 'Product Management',
     emailOpenError: 'Could not open the email app.',
+    saveProfile: 'Save Profile',
+    profileSaved: 'Your profile has been saved.',
+    editProfile: 'Edit Profile',
+    deliveryAddress: 'Delivery address',
+    useHomeAddress: 'Use home address',
+    alternateAddress: 'Different delivery address',
+    emptyCart: 'Your cart is empty.',
+    continueShopping: 'Continue shopping',
+    removeItem: 'Remove',
+    subtotal: 'Items subtotal',
+    checkout: 'Continue to checkout',
+    cartSaved: 'Your cart is saved on this phone.',
+    profileRequired: 'Save your name, mobile and address in Profile before ordering.',
   },
 };
 
@@ -357,9 +390,12 @@ function normalizeOrder(order) {
     weightSurcharge: order.weight_surcharge ?? null,
     appFee: order.app_fee ?? null,
     totalWeightKg: order.total_weight_kg ?? null,
-
     status: order.status || 'Pending',
-    cancellationReason: order.cancellation_reason || order.cancellationReason || order.cancel_reason || '',
+    cancellationReason:
+      order.cancellation_reason ||
+      order.cancellationReason ||
+      order.cancel_reason ||
+      '',
     payment: order.payment_method || order.payment || 'COD',
     items: Array.isArray(order.items) ? order.items : [],
     createdAt: order.created_at || order.createdAt || '',
@@ -394,6 +430,14 @@ export default function App() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [pinCode, setPinCode] = useState('');
+
+  const [profileName, setProfileName] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileAddress, setProfileAddress] = useState('');
+  const [profilePinCode, setProfilePinCode] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [useAlternateAddress, setUseAlternateAddress] = useState(false);
+
   const [offers, setOffers] = useState([]);
   const [newOfferTitle, setNewOfferTitle] = useState('');
   const [newOfferDescription, setNewOfferDescription] = useState('');
@@ -486,6 +530,27 @@ export default function App() {
           setLanguage(savedLanguage);
         }
 
+        const savedProfile = await AsyncStorage.getItem(PROFILE_KEY);
+        if (savedProfile && active) {
+          const profile = JSON.parse(savedProfile);
+          setProfileName(profile.name || '');
+          setProfilePhone(profile.phone || '');
+          setProfileAddress(profile.address || '');
+          setProfilePinCode(profile.pinCode || '');
+          setName(profile.name || '');
+          setPhone(profile.phone || '');
+          setAddress(profile.address || '');
+          setPinCode(profile.pinCode || '');
+        }
+
+        const savedCart = await AsyncStorage.getItem(CART_KEY);
+        if (savedCart && active) {
+          const parsedCart = JSON.parse(savedCart);
+          if (parsedCart && typeof parsedCart === 'object') {
+            setCart(parsedCart);
+          }
+        }
+
         const saved = await AsyncStorage.getItem(KEY);
         if (saved && active) {
           const parsed = JSON.parse(saved);
@@ -516,7 +581,8 @@ export default function App() {
       }
     }
 
-    initialize();     return () => {
+    initialize();
+    return () => {
       active = false;
     };
   }, []);
@@ -533,6 +599,12 @@ export default function App() {
     );
   }, [language]);
 
+  useEffect(() => {
+    AsyncStorage.setItem(CART_KEY, JSON.stringify(cart)).catch(error =>
+      console.log('Cart save error:', error),
+    );
+  }, [cart]);
+
   const items = useMemo(
     () =>
       data.products.filter(product =>
@@ -545,6 +617,11 @@ export default function App() {
     const product = data.products.find(item => item.id === id);
     return sum + (product ? product.price * quantity : 0);
   }, 0);
+
+  const cartCount = Object.values(cart).reduce(
+    (sum, quantity) => sum + Number(quantity || 0),
+    0,
+  );
 
   const productLabel = product =>
     language === 'en'
@@ -608,7 +685,7 @@ export default function App() {
 
   const header = (
     <View style={styles.header}>
-      <Text style={styles.brand}>🛒 RationSetu</Text>
+      <Text style={styles.brand}>RationSetu</Text>
       <Text style={styles.sub}>{t('tagline')}</Text>
       <Text style={styles.connection}>
         {isOnline ? t('online') : t('offline')}
@@ -623,8 +700,61 @@ export default function App() {
     setCart(previous => {
       const current = previous[id] || 0;
       const next = Math.max(0, Math.min(product.stock, current + difference));
-      return {...previous, [id]: next};
+      const updated = {...previous};
+      if (next === 0) {
+        delete updated[id];
+      } else {
+        updated[id] = next;
+      }
+      return updated;
     });
+  }
+
+  function removeCartItem(id) {
+    setCart(previous => {
+      const updated = {...previous};
+      delete updated[id];
+      return updated;
+    });
+  }
+
+  async function saveCustomerProfile() {
+    const cleanPhone = profilePhone.replace(/\D/g, '');
+
+    if (!profileName.trim()) {
+      Alert.alert(t('infoIncomplete'), t('fillName'));
+      return;
+    }
+    if (!/^[0-9]{10}$/.test(cleanPhone)) {
+      Alert.alert(t('wrongMobile'), t('fillMobile'));
+      return;
+    }
+    if (!profileAddress.trim()) {
+      Alert.alert(t('addressIncomplete'), t('fillAddress'));
+      return;
+    }
+    if (!/^[0-9]{6}$/.test(profilePinCode.trim())) {
+      Alert.alert(t('pinRequired'));
+      return;
+    }
+
+    const profile = {
+      name: profileName.trim(),
+      phone: cleanPhone,
+      address: profileAddress.trim(),
+      pinCode: profilePinCode.trim(),
+    };
+
+    try {
+      await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+      setName(profile.name);
+      setPhone(profile.phone);
+      setAddress(profile.address);
+      setPinCode(profile.pinCode);
+      Alert.alert(t('success'), t('profileSaved'));
+    } catch (error) {
+      Alert.alert(t('updateFailed'), error.message);
+    }
   }
 
   async function getCustomerLocation() {
@@ -645,9 +775,7 @@ export default function App() {
       customer_lat: position.coords.latitude,
       customer_lng: position.coords.longitude,
     };
-  }
-
-  async function loadOffers() {
+  }   async function loadOffers() {
     try {
       const result = await apiRequest('/api/offers');
 
@@ -674,9 +802,7 @@ export default function App() {
   }
 
   async function uploadOfferImage(photo) {
-    if (!photo?.uri) {
-      throw new Error(t('uploadFailed'));
-    }
+    if (!photo?.uri) throw new Error(t('uploadFailed'));
 
     const form = new FormData();
     form.append('file', {
@@ -703,20 +829,14 @@ export default function App() {
     }
 
     const imageUrl = result.image_url || result.url;
-
-    if (!imageUrl) {
-      throw new Error(t('uploadFailed'));
-    }
+    if (!imageUrl) throw new Error(t('uploadFailed'));
 
     return imageUrl;
   }
 
   async function chooseOfferPhoto() {
     const photo = await chooseProductImage();
-
-    if (photo) {
-      setNewOfferImage(photo);
-    }
+    if (photo) setNewOfferImage(photo);
   }
 
   async function saveOffer() {
@@ -768,17 +888,15 @@ export default function App() {
         throw new Error(result.message || t('uploadFailed'));
       }
 
-      setOffers(previous => {
-        if (isEditing) {
-          return previous.map(item =>
-            String(item.id) === String(result.offer.id)
-              ? result.offer
-              : item,
-          );
-        }
-
-        return [result.offer, ...previous];
-      });
+      setOffers(previous =>
+        isEditing
+          ? previous.map(item =>
+              String(item.id) === String(result.offer.id)
+                ? result.offer
+                : item,
+            )
+          : [result.offer, ...previous],
+      );
 
       setNewOfferTitle('');
       setNewOfferDescription('');
@@ -836,20 +954,41 @@ export default function App() {
   async function placeOrder() {
     if (loading) return;
 
-    if (!name.trim()) {
+    const customerName = profileName.trim();
+    const customerPhone = profilePhone.trim();
+    const customerPin = profilePinCode.trim();
+    const customerAddress = useAlternateAddress
+      ? deliveryAddress.trim()
+      : profileAddress.trim();
+
+    if (!customerName) {
       Alert.alert(t('infoIncomplete'), t('fillName'));
+      setScreen('profile');
       return;
     }
 
-    if (!/^[0-9]{10}$/.test(phone.trim())) {
+    if (!/^[0-9]{10}$/.test(customerPhone)) {
       Alert.alert(t('wrongMobile'), t('fillMobile'));
+      setScreen('profile');
       return;
     }
 
-    if (!address.trim()) {
+    if (!customerAddress) {
       Alert.alert(t('addressIncomplete'), t('fillAddress'));
+      setScreen('profile');
       return;
-    } 
+    }
+
+    if (!/^[0-9]{6}$/.test(customerPin)) {
+      Alert.alert(
+        t('addressIncomplete'),
+        language === 'en'
+          ? 'Enter a valid 6-digit PIN Code in your Profile.'
+          : 'प्रोफाइल में सही 6 अंकों का PIN Code भरें।',
+      );
+      setScreen('profile');
+      return;
+    }
 
     const selectedItems = Object.entries(cart)
       .filter(
@@ -886,10 +1025,10 @@ export default function App() {
       const result = await apiRequest('/api/orders', {
         method: 'POST',
         body: JSON.stringify({
-          customer_name: name.trim(),
-          mobile: phone.trim(),
-          address: address.trim(),
-          pin_code: pinCode.trim(),
+          customer_name: customerName,
+          mobile: customerPhone,
+          address: customerAddress,
+          pin_code: customerPin,
           items: selectedItems,
           total_amount: orderTotal,
           customer_lat: customerLocation.customer_lat,
@@ -903,9 +1042,9 @@ export default function App() {
 
       const savedOrder = normalizeOrder({
         ...result.order,
-        customer_name: result.order.customer_name || name.trim(),
-        mobile: result.order.mobile || phone.trim(),
-        address: result.order.address || address.trim(),
+        customer_name: result.order.customer_name || customerName,
+        mobile: result.order.mobile || customerPhone,
+        address: result.order.address || customerAddress,
         items: result.order.items || selectedItems,
         total_amount: result.order.total_amount ?? orderTotal,
         customer_order_token:
@@ -924,16 +1063,18 @@ export default function App() {
       }));
 
       setCart({});
-      setScreen('success');
+      await AsyncStorage.setItem(CART_KEY, JSON.stringify({}));
 
+      setScreen('success');
       Alert.alert(t('orderSuccessTitle'), t('orderServerSuccess'));
     } catch (error) {
       Alert.alert(t('orderFailed'), error.message);
     } finally {
       setLoading(false);
     }
-  } 
-function renderBillingBreakdown(order) {
+  }
+
+  function renderBillingBreakdown(order) {
     const items = Array.isArray(order.items) ? order.items : [];
 
     const savedItemSubtotal =
@@ -988,6 +1129,7 @@ function renderBillingBreakdown(order) {
               {language === 'en' ? 'App Fee' : 'ऐप फीस'}:
               {' '}{money(order.appFee)}
             </Text>
+
             {order.totalWeightKg !== null &&
               order.totalWeightKg !== undefined && (
                 <Text>
@@ -1012,7 +1154,7 @@ function renderBillingBreakdown(order) {
     );
   }
 
-async function refreshCustomerOrder(order) {
+  async function refreshCustomerOrder(order) {
     if (!order.customerOrderToken) {
       Alert.alert(
         t('refreshStatus'),
@@ -1150,7 +1292,6 @@ async function refreshCustomerOrder(order) {
       await loadAdminOffers(result.token);
 
       setScreen('admin');
-
       Alert.alert(t('success'), t('adminLoginSuccess'));
     } catch (error) {
       Alert.alert(t('adminError'), error.message);
@@ -1201,7 +1342,8 @@ async function refreshCustomerOrder(order) {
             orders: [...remoteOrders, ...localOnlyOrders],
           };
         });
-      }     } catch (error) {
+      }
+    } catch (error) {
       Alert.alert(t('ordersNotLoaded'), error.message);
     }
   }
@@ -1276,16 +1418,11 @@ async function refreshCustomerOrder(order) {
 
   async function selectNewProductImage() {
     const photo = await chooseProductImage();
-
-    if (photo) {
-      setNewImage(photo);
-    }
+    if (photo) setNewImage(photo);
   }
 
   async function uploadProductImage(photo) {
-    if (!photo?.uri) {
-      throw new Error(t('uploadFailed'));
-    }
+    if (!photo?.uri) throw new Error(t('uploadFailed'));
 
     const form = new FormData();
 
@@ -1313,10 +1450,7 @@ async function refreshCustomerOrder(order) {
     }
 
     const imageUrl = result.image_url || result.url;
-
-    if (!imageUrl) {
-      throw new Error(t('uploadFailed'));
-    }
+    if (!imageUrl) throw new Error(t('uploadFailed'));
 
     return imageUrl;
   }
@@ -1390,7 +1524,6 @@ async function refreshCustomerOrder(order) {
     if (loading || uploadingPhotoId) return;
 
     const photo = await chooseProductImage();
-
     if (!photo) return;
 
     setUploadingPhotoId(product.id);
@@ -1499,9 +1632,7 @@ async function refreshCustomerOrder(order) {
   }
 
   function openSupportEmail() {
-    const url = `mailto:${SUPPORT_EMAIL}`;
-
-    Linking.openURL(url).catch(() =>
+    Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() =>
       Alert.alert(t('emailSupport'), t('emailOpenError')),
     );
   }
@@ -1523,12 +1654,15 @@ async function refreshCustomerOrder(order) {
       {header}
 
       {screen !== 'login' && (
-  <View style={styles.nav}>
-    {button(t('home'), () => setScreen('home'))}
-    {button(t('myOrders'), () => setScreen('myorders'))}
-    {button(t('settings'), () => setScreen('settings'))}
-  </View>
-)}
+        <View style={styles.nav}>
+          {button(t('home'), () => setScreen('home'))}
+          {button(t('myOrders'), () => setScreen('myorders'))}
+          {button(
+            language === 'en' ? 'Admin' : 'एडमिन',
+            () => setScreen('adminLogin'),
+          )}
+        </View>
+      )}
 
       {cancellationOrder ? (
         <View style={styles.cancelOverlay}>
@@ -1543,12 +1677,7 @@ async function refreshCustomerOrder(order) {
               style={styles.cancelReasonInput}
               placeholderTextColor="#8193a5"
             />
-            {button(
-              t('submitCancellation'),
-              submitCancellation,
-              true,
-              loading,
-            )}
+            {button(t('submitCancellation'), submitCancellation, true, loading)}
             {button(
               language === 'en' ? 'Back' : 'वापस',
               () => {
@@ -1561,8 +1690,41 @@ async function refreshCustomerOrder(order) {
           </View>
         </View>
       ) : null}
+
       {screen === 'home' && (
         <ScrollView style={styles.body}>
+          <View style={styles.homeTopActions}>
+            <TouchableOpacity
+              style={styles.cartHeaderButton}
+              onPress={() => setScreen('cart')}>
+              <View style={styles.cartIconShape}>
+                <View style={styles.cartHandle} />
+                <View style={styles.cartBasket} />
+                <View style={styles.cartWheelRow}>
+                  <View style={styles.cartWheel} />
+                  <View style={styles.cartWheel} />
+                </View>
+              </View>
+              <Text style={styles.headerActionText}>
+                {language === 'en' ? 'Cart' : 'कार्ट'}
+              </Text>
+              {cartCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.profileHeaderButton}
+              onPress={() => setScreen('profile')}>
+              <Text style={styles.profileSymbol}>●</Text>
+              <Text style={styles.headerActionText}>
+                {language === 'en' ? 'Profile' : 'प्रोफाइल'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <Text style={styles.title}>{t('orderTitle')}</Text>
           <Text style={styles.muted}>{t('serviceArea')}</Text>
 
@@ -1576,9 +1738,7 @@ async function refreshCustomerOrder(order) {
             .filter(offer => offer.is_active === true)
             .map(offer => (
               <View style={styles.card} key={`customer-offer-${offer.id}`}>
-                <Text style={styles.title}>
-                  {offer.title}
-                </Text>
+                <Text style={styles.title}>{offer.title}</Text>
 
                 {offer.image_url ? (
                   <Image
@@ -1589,9 +1749,7 @@ async function refreshCustomerOrder(order) {
                 ) : null}
 
                 {offer.description ? (
-                  <Text style={styles.muted}>
-                    {offer.description}
-                  </Text>
+                  <Text style={styles.muted}>{offer.description}</Text>
                 ) : null}
               </View>
             ))}
@@ -1638,31 +1796,6 @@ async function refreshCustomerOrder(order) {
             <Text style={styles.muted}>{t('noProduct')}</Text>
           )}
 
-          <Text style={styles.title}>{t('deliveryInfo')}</Text>
-
-          {field(name, setName, t('customerName'))}
-
-          {field(
-            phone,
-            value => setPhone(value.replace(/\D/g, '').slice(0, 10)),
-            t('mobile'),
-            'phone-pad',
-          )}
-
-
-          {field(address, setAddress, t('fullAddress'))}
-
-          <TextInput
-            value={pinCode}
-            onChangeText={value =>
-              setPinCode(value.replace(/\D/g, '').slice(0, 6))
-            }
-            placeholder={t('pinCode')}
-            keyboardType="number-pad"
-            maxLength={6}
-            style={styles.input}
-          />
-
           <View style={styles.total}>
             <Text style={styles.item}>
               {t('total')}: {money(total)}
@@ -1670,13 +1803,343 @@ async function refreshCustomerOrder(order) {
             <Text style={styles.muted}>{t('paymentCod')}</Text>
           </View>
 
-          {button(t('sendOrder'), placeOrder, true, loading)}
+          {button(
+            language === 'en'
+              ? `View Cart (${cartCount})`
+              : `कार्ट देखें (${cartCount})`,
+            () => setScreen('cart'),
+            true,
+          )}
+        </ScrollView>
+      )}
+
+      {screen === 'cart' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>
+            {language === 'en' ? 'My Cart' : 'मेरा कार्ट'}
+          </Text>
+
+          {Object.entries(cart)
+            .filter(([id, quantity]) =>
+              quantity > 0 &&
+              data.products.some(product => product.id === id),
+            )
+            .map(([id, quantity]) => {
+              const product = data.products.find(item => item.id === id);
+              const lineTotal = Number(product.price || 0) * quantity;
+
+              return (
+                <View style={styles.cartItemCard} key={`cart-${id}`}>
+                  <View style={styles.cartItemDetails}>
+                    {product.image_url ? (
+                      <Image
+                        source={{uri: product.image_url}}
+                        style={styles.cartItemImage}
+                        resizeMode="cover"
+                      />
+                    ) : null}
+
+                    <View style={styles.cartItemText}>
+                      <Text style={styles.item}>
+                        {productLabel(product)}
+                      </Text>
+                      <Text style={styles.muted}>
+                        {money(product.price)} / {unitLabel(product.unit)}
+                      </Text>
+                      <Text style={styles.cartLineTotal}>
+                        {language === 'en' ? 'Amount' : 'रकम'}: {money(lineTotal)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.cartControls}>
+                    <TouchableOpacity
+                      style={styles.cartQtyButton}
+                      onPress={() => changeQuantity(id, -1)}>
+                      <Text style={styles.cartQtyButtonText}>−</Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.cartQtyNumber}>{quantity}</Text>
+
+                    <TouchableOpacity
+                      style={styles.cartQtyButton}
+                      onPress={() => changeQuantity(id, 1)}>
+                      <Text style={styles.cartQtyButtonText}>+</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.removeCartButton}
+                      onPress={() => removeCartItem(id)}>
+                      <Text style={styles.removeCartText}>
+                        {language === 'en' ? 'Remove' : 'हटाएँ'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+
+          {cartCount === 0 && (
+            <View style={styles.card}>
+              <Text style={styles.item}>
+                {language === 'en' ? 'Your cart is empty.' : 'आपका कार्ट खाली है।'}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.total}>
+            <Text style={styles.item}>
+              {language === 'en' ? 'Cart Total' : 'कार्ट का कुल'}: {money(total)}
+            </Text>
+            <Text style={styles.muted}>{t('paymentCod')}</Text>
+          </View>
+
+          {cartCount > 0 && (
+            <>
+              <Text style={styles.title}>
+                {language === 'en' ? 'Delivery Details' : 'डिलीवरी की जानकारी'}
+              </Text>
+
+              <Text style={styles.muted}>
+                {language === 'en'
+                  ? 'Your saved Profile details will be used for this order.'
+                  : 'इस ऑर्डर के लिए आपकी प्रोफाइल में सेव जानकारी इस्तेमाल होगी।'}
+              </Text>
+
+              <View style={styles.card}>
+                <Text style={styles.item}>{profileName || '-'}</Text>
+                <Text>{profilePhone || '-'}</Text>
+                <Text>{profileAddress || '-'}</Text>
+                <Text>
+                  {language === 'en' ? 'PIN Code' : 'पिन कोड'}: {profilePinCode || '-'}
+                </Text>
+              </View>
+
+              {button(
+                language === 'en' ? 'Edit Profile' : 'प्रोफाइल बदलें',
+                () => setScreen('profile'),
+              )}
+
+              {button(
+                language === 'en' ? 'Place COD Order' : 'कैश ऑन डिलीवरी ऑर्डर करें',
+                placeOrder,
+                true,
+                loading,
+              )}
+            </>
+          )}
+
+          {button(
+            language === 'en' ? 'Continue Shopping' : 'खरीदारी जारी रखें',
+            () => setScreen('home'),
+          )}
+        </ScrollView>
+      )}
+
+      {screen === 'profile' && (
+        <ScrollView style={styles.body}>
+          <Text style={styles.title}>
+            {language === 'en' ? 'Customer Profile' : 'ग्राहक प्रोफाइल'}
+          </Text>
+
+          <Text style={styles.muted}>
+            {language === 'en'
+              ? 'Save your details once. They will be used automatically for future orders.'
+              : 'अपनी जानकारी एक बार सेव करें। आगे के ऑर्डर में यह अपने आप इस्तेमाल होगी।'}
+          </Text>
+
+          <Text style={styles.editLabel}>
+            {language === 'en' ? 'Customer Name' : 'ग्राहक का नाम'}
+          </Text>
+          <TextInput
+            value={profileName}
+            onChangeText={setProfileName}
+            placeholder={t('customerName')}
+            style={styles.input}
+          />
+
+          <Text style={styles.editLabel}>
+            {language === 'en' ? 'Mobile Number' : 'मोबाइल नंबर'}
+          </Text>
+          <TextInput
+            value={profilePhone}
+            onChangeText={value =>
+              setProfilePhone(value.replace(/\D/g, '').slice(0, 10))
+            }
+            placeholder={t('mobile')}
+            keyboardType="phone-pad"
+            maxLength={10}
+            style={styles.input}
+          />
+
+          <Text style={styles.editLabel}>
+            {language === 'en' ? 'Home Address' : 'घर का पूरा पता'}
+          </Text>
+          <TextInput
+            value={profileAddress}
+            onChangeText={setProfileAddress}
+            placeholder={t('fullAddress')}
+            multiline
+            style={[styles.input, styles.multilineInput]}
+          />
+
+          <Text style={styles.editLabel}>PIN Code</Text>
+          <TextInput
+            value={profilePinCode}
+            onChangeText={value =>
+              setProfilePinCode(value.replace(/\D/g, '').slice(0, 6))
+            }
+            placeholder={t('pinCode')}
+            keyboardType="number-pad"
+            maxLength={6}
+            style={styles.input}
+          />
+
+          {button(
+            language === 'en' ? 'Use Current Location' : 'मेरी मौजूदा लोकेशन लें',
+            async () => {
+              const location = await getCustomerLocation();
+              if (
+                location.customer_lat !== null &&
+                location.customer_lng !== null
+              ) {
+                Alert.alert(
+                  language === 'en' ? 'Location received' : 'लोकेशन मिल गई',
+                  language === 'en'
+                    ? 'Your location can be attached to your order.'
+                    : 'आपकी लोकेशन ऑर्डर के साथ भेजी जा सकेगी।',
+                );
+              }
+            },
+          )}
+
+          {button(
+            language === 'en' ? 'Save Profile' : 'प्रोफाइल सेव करें',
+            saveCustomerProfile,
+            true,
+          )}
+
+          <View style={styles.dividerLine} />
+
+          <Text style={styles.title}>
+            {language === 'en' ? 'Delivery Address' : 'डिलीवरी का पता'}
+          </Text>
+
+          <Text style={styles.muted}>
+            {language === 'en'
+              ? 'Use another address for a particular order if needed.'
+              : 'जरूरत पड़ने पर किसी ऑर्डर के लिए दूसरा पता इस्तेमाल करें।'}
+          </Text>
+
+          <TouchableOpacity
+            style={styles.alternateAddressToggle}
+            onPress={() => setUseAlternateAddress(value => !value)}>
+            <View style={[
+              styles.toggleSquare,
+              useAlternateAddress && styles.toggleSquareSelected,
+            ]}>
+              {useAlternateAddress ? (
+                <Text style={styles.toggleTick}>✓</Text>
+              ) : null}
+            </View>
+            <Text style={styles.item}>
+              {language === 'en'
+                ? 'Deliver to a different address'
+                : 'दूसरे पते पर डिलीवरी करें'}
+            </Text>
+          </TouchableOpacity>
+
+          {useAlternateAddress && (
+            <TextInput
+              value={deliveryAddress}
+              onChangeText={setDeliveryAddress}
+              placeholder={
+                language === 'en'
+                  ? 'Enter alternate delivery address'
+                  : 'दूसरा डिलीवरी पता लिखें'
+              }
+              multiline
+              style={[styles.input, styles.multilineInput]}
+            />
+          )}
+
+          <View style={styles.dividerLine} />
+
+          <Text style={styles.title}>
+            {language === 'en' ? 'Settings' : 'सेटिंग्स'}
+          </Text>
+
+          <Text style={styles.item}>
+            {t('language')} / Language
+          </Text>
+          <Text style={styles.muted}>{t('chooseLanguage')}</Text>
+
+          <TouchableOpacity
+            onPress={() => {
+              setLanguage('hi');
+              AsyncStorage.setItem(LANGUAGE_KEY, 'hi').catch(error =>
+                console.log('Language save error:', error),
+              );
+              Alert.alert('भाषा', translations.hi.savedLanguage);
+            }}
+            style={[
+              styles.languageOption,
+              language === 'hi' && styles.selectedLanguage,
+            ]}>
+            <Text style={styles.languageText}>हिन्दी</Text>
+            <Text style={styles.languageMark}>
+              {language === 'hi' ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setLanguage('en');
+              AsyncStorage.setItem(LANGUAGE_KEY, 'en').catch(error =>
+                console.log('Language save error:', error),
+              );
+              Alert.alert('Language', translations.en.savedLanguage);
+            }}
+            style={[
+              styles.languageOption,
+              language === 'en' && styles.selectedLanguage,
+            ]}>
+            <Text style={styles.languageText}>English</Text>
+            <Text style={styles.languageMark}>
+              {language === 'en' ? '✓' : ''}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.supportBox}>
+            <Text style={styles.supportTitle}>{t('helpSupport')}</Text>
+            {button(t('contactWhatsApp'), openWhatsApp, true)}
+            {button(t('callSupport'), callSupport)}
+            {button(t('emailSupport'), openSupportEmail)}
+            <Text style={styles.supportDetail}>{SUPPORT_EMAIL}</Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.item}>
+              {language === 'en' ? 'About RationSetu' : 'RationSetu के बारे में'}
+            </Text>
+            <Text style={styles.muted}>
+              {language === 'en'
+                ? 'RationSetu helps customers order grocery items for home delivery.'
+                : 'RationSetu ग्राहकों को घर पर सामान मंगाने की सुविधा देता है।'}
+            </Text>
+          </View>
+
+          {button(
+            language === 'en' ? 'Back to Home' : 'होम पर वापस जाएँ',
+            () => setScreen('home'),
+            true,
+          )}
         </ScrollView>
       )}
 
       {screen === 'success' && (
         <View style={styles.body}>
-          <Text style={styles.title}>✅ {t('orderSuccess')}</Text>
+          <Text style={styles.title}>✓ {t('orderSuccess')}</Text>
           <Text style={styles.muted}>{t('orderSaved')}</Text>
           {button(t('goHome'), () => setScreen('home'), true)}
           {button(t('seeOrders'), () => setScreen('myorders'))}
@@ -1694,9 +2157,7 @@ async function refreshCustomerOrder(order) {
 
           {data.orders.map(order => (
             <View style={styles.card} key={order.id}>
-              <Text style={styles.item}>
-                Order #{order.id}
-              </Text>
+              <Text style={styles.item}>Order #{order.id}</Text>
 
               <Text style={styles.statusText}>
                 {t('status')}: {statusLabel(order.status)}
@@ -1708,28 +2169,20 @@ async function refreshCustomerOrder(order) {
                 </Text>
               ) : null}
 
-              <Text>
-                {t('customer')}: {order.customer || '-'}
-              </Text>
-              <Text>
-                {t('mobile')}: {order.phone || '-'}
-              </Text>
-              <Text>
-                {t('address')}: {order.address || '-'}
-              </Text>
-                {renderBillingBreakdown(order)}
+              <Text>{t('customer')}: {order.customer || '-'}</Text>
+              <Text>{t('mobile')}: {order.phone || '-'}</Text>
+              <Text>{t('address')}: {order.address || '-'}</Text>
+
+              {renderBillingBreakdown(order)}
+
               <Text>{t('payment')}: {order.payment || 'COD'}</Text>
-              <Text style={styles.muted}>
-                {order.createdAt || ''}
-              </Text>
+              <Text style={styles.muted}>{order.createdAt || ''}</Text>
 
               {Array.isArray(order.statusHistory) &&
                 order.statusHistory.length > 0 && (
                   <View style={styles.historyBox}>
                     <Text style={styles.editLabel}>
-                      {language === 'en'
-                        ? 'Order progress'
-                        : 'ऑर्डर की प्रगति'}
+                      {language === 'en' ? 'Order progress' : 'ऑर्डर की प्रगति'}
                     </Text>
 
                     {order.statusHistory.map((entry, index) => (
@@ -1744,16 +2197,10 @@ async function refreshCustomerOrder(order) {
                 )}
 
               <View style={styles.actionRow}>
-                {button(
-                  t('refreshStatus'),
-                  () => refreshCustomerOrder(order),
-                )}
+                {button(t('refreshStatus'), () => refreshCustomerOrder(order))}
 
                 {!['Delivered', 'Cancelled'].includes(order.status) &&
-                  button(
-                    t('cancelOrder'),
-                    () => cancelCustomerOrder(order),
-                  )}
+                  button(t('cancelOrder'), () => cancelCustomerOrder(order))}
               </View>
             </View>
           ))}
@@ -1769,16 +2216,8 @@ async function refreshCustomerOrder(order) {
       {screen === 'adminLogin' && (
         <ScrollView style={styles.body}>
           <Text style={styles.title}>{t('adminLogin')}</Text>
-
           {field(adminId, setAdminId, t('adminId'))}
-          {field(
-            adminPassword,
-            setAdminPassword,
-            t('adminPassword'),
-            'default',
-            true,
-          )}
-
+          {field(adminPassword, setAdminPassword, t('adminPassword'), 'default', true)}
           {button(t('adminLogin'), adminLogin, true, loading)}
           {button(t('goHome'), () => setScreen('home'))}
         </ScrollView>
@@ -1794,28 +2233,16 @@ async function refreshCustomerOrder(order) {
             </Text>
           </View>
 
-          {button(
-            t('refreshOrders'),
-            () => loadAdminOrders(),
-            true,
-            loading,
-          )}
+          {button(t('refreshOrders'), () => loadAdminOrders(), true, loading)}
 
           <Text style={styles.title}>{t('adminOrders')}</Text>
 
           {data.orders.map(order => (
             <View style={styles.card} key={`admin-${order.id}`}>
               <Text style={styles.item}>Order #{order.id}</Text>
-
-              <Text>
-                {t('customer')}: {order.customer || '-'}
-              </Text>
-              <Text>
-                {t('mobile')}: {order.phone || '-'}
-              </Text>
-              <Text>
-                {t('address')}: {order.address || '-'}
-              </Text>
+              <Text>{t('customer')}: {order.customer || '-'}</Text>
+              <Text>{t('mobile')}: {order.phone || '-'}</Text>
+              <Text>{t('address')}: {order.address || '-'}</Text>
 
               {renderBillingBreakdown(order)}
               <Text>{t('payment')}: {order.payment || 'COD'}</Text>
@@ -1828,60 +2255,32 @@ async function refreshCustomerOrder(order) {
                 order.cancellationReason &&
                 button(
                   t('reasonView'),
-                  () =>
-                    Alert.alert(
-                      t('cancellationReason'),
-                      order.cancellationReason,
-                    ),
+                  () => Alert.alert(t('cancellationReason'), order.cancellationReason),
                 )}
 
               <Text style={styles.muted}>{order.createdAt || ''}</Text>
 
               <View style={styles.actionRow}>
-                {button(
-                  t('accept'),
-                  () => updateOrderStatus(order.id, 'Accepted'),
-                  false,
-                  loading,               )}
-                {button(
-                  t('preparing'),
-                  () => updateOrderStatus(order.id, 'Preparing'),
-                  false,
-                  loading,
-                )}
+                {button(t('accept'), () => updateOrderStatus(order.id, 'Accepted'), false, loading)}
+                {button(t('preparing'), () => updateOrderStatus(order.id, 'Preparing'), false, loading)}
               </View>
 
               <View style={styles.actionRow}>
-                {button(
-                  t('outForDelivery'),
-                  () => updateOrderStatus(order.id, 'Out for Delivery'),
-                  false,
-                  loading,
-                )}
-                {button(
-                  t('delivered'),
-                  () => updateOrderStatus(order.id, 'Delivered'),
-                  false,
-                  loading,
-                )}
+                {button(t('outForDelivery'), () => updateOrderStatus(order.id, 'Out for Delivery'), false, loading)}
+                {button(t('delivered'), () => updateOrderStatus(order.id, 'Delivered'), false, loading)}
               </View>
 
               {order.status !== 'Delivered' &&
                 order.status !== 'Cancelled' &&
-                button(
-                  t('cancel'),
-                  () => updateOrderStatus(order.id, 'Cancelled'),
-                  false,
-                  loading,
-                )}
+                button(t('cancel'), () => updateOrderStatus(order.id, 'Cancelled'), false, loading)}
             </View>
           ))}
-  {data.orders.length === 0 && (
+
+          {data.orders.length === 0 && (
             <Text style={styles.muted}>{t('noOrders')}</Text>
           )}
 
           <Text style={styles.title}>{t('offers')}</Text>
-
           <Text style={styles.editLabel}>
             {editingOfferId ? t('editOffer') : t('addOffer')}
           </Text>
@@ -1906,13 +2305,7 @@ async function refreshCustomerOrder(order) {
           ) : null}
 
           {button(t('chooseOfferImage'), chooseOfferPhoto)}
-
-          {button(
-            editingOfferId ? t('saveOffer') : t('addOffer'),
-            saveOffer,
-            true,
-            loading,
-          )}
+          {button(editingOfferId ? t('saveOffer') : t('addOffer'), saveOffer, true, loading)}
 
           {editingOfferId
             ? button(
@@ -1939,9 +2332,7 @@ async function refreshCustomerOrder(order) {
               ) : null}
 
               {offer.description ? (
-                <Text style={styles.muted}>
-                  {offer.description}
-                </Text>
+                <Text style={styles.muted}>{offer.description}</Text>
               ) : null}
 
               <Text style={styles.statusText}>
@@ -1951,15 +2342,9 @@ async function refreshCustomerOrder(order) {
               </Text>
 
               <View style={styles.actionRow}>
+                {button(t('editOffer'), () => startEditOffer(offer))}
                 {button(
-                  t('editOffer'),
-                  () => startEditOffer(offer),
-                )}
-
-                {button(
-                  offer.is_active
-                    ? t('deactivateOffer')
-                    : t('activateOffer'),
+                  offer.is_active ? t('deactivateOffer') : t('activateOffer'),
                   () => toggleOffer(offer),
                 )}
               </View>
@@ -2044,17 +2429,10 @@ async function refreshCustomerOrder(order) {
                   style={styles.input}
                 />
 
-                {button(
-                  t('saveChanges'),
-                  () => saveProductPriceStock(product),
-                  true,
-                  loading,
-                )}
+                {button(t('saveChanges'), () => saveProductPriceStock(product), true, loading)}
 
                 {button(
-                  uploadingPhotoId === product.id
-                    ? t('wait')
-                    : t('replacePhoto'),
+                  uploadingPhotoId === product.id ? t('wait') : t('replacePhoto'),
                   () => replaceProductImage(product),
                   false,
                   Boolean(uploadingPhotoId) || loading,
@@ -2066,98 +2444,35 @@ async function refreshCustomerOrder(order) {
           {button(t('logout'), logoutAdmin)}
         </ScrollView>
       )}
-
-      {screen === 'settings' && (
-        <ScrollView style={styles.body}>
-          <Text style={styles.title}>{t('settings')}</Text>
-
-          <Text style={styles.item}>
-            {t('language')} / Language
-          </Text>
-          <Text style={styles.muted}>{t('chooseLanguage')}</Text>
-
-          <TouchableOpacity
-            onPress={() => {
-              setLanguage('hi');
-              AsyncStorage.setItem(LANGUAGE_KEY, 'hi').catch(error =>
-                console.log('Language save error:', error),
-              );
-              Alert.alert('भाषा', translations.hi.savedLanguage);
-            }}
-            style={[
-              styles.languageOption,
-              language === 'hi' && styles.selectedLanguage,
-            ]}>
-            <Text style={styles.languageText}>🇮🇳 हिन्दी</Text>
-            <Text style={styles.languageMark}>
-              {language === 'hi' ? '✓' : ''}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => {
-              setLanguage('en');
-              AsyncStorage.setItem(LANGUAGE_KEY, 'en').catch(error =>
-                console.log('Language save error:', error),
-              );
-              Alert.alert('Language', translations.en.savedLanguage);
-            }}
-            style={[
-              styles.languageOption,
-              language === 'en' && styles.selectedLanguage,
-            ]}>
-            <Text style={styles.languageText}>🇬🇧 English</Text>
-            <Text style={styles.languageMark}>
-              {language === 'en' ? '✓' : ''}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.supportBox}>
-            <Text style={styles.supportTitle}>{t('helpSupport')}</Text>
-
-            {button(t('contactWhatsApp'), openWhatsApp, true)}
-            {button(t('callSupport'), callSupport)}
-            {button(t('emailSupport'), openSupportEmail)}
-
-            <Text style={styles.supportDetail}>
-              {SUPPORT_EMAIL}
-            </Text>
-          </View>
-
-          {button(t('goHome'), () => setScreen('home'), true)}
-        </ScrollView>
-      )}
     </SafeAreaView>
   );
-}
-
-const styles = StyleSheet.create({
+} const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: '#f3f7fc',
   },
   header: {
     backgroundColor: '#1769aa',
-    minHeight: 160,
+    minHeight: 150,
     paddingHorizontal: 22,
-    paddingVertical: 24,
+    paddingVertical: 22,
     justifyContent: 'center',
   },
   brand: {
     color: '#fff',
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: 'bold',
   },
   sub: {
     color: '#e8f2fb',
     marginTop: 6,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '500',
   },
   connection: {
     color: '#e8f2fb',
     marginTop: 9,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   nav: {
@@ -2194,6 +2509,98 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 8,
     marginBottom: 3,
+  },
+  homeTopActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cartHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d4e1ed',
+    borderRadius: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    minWidth: 110,
+  },
+  cartIconShape: {
+    width: 28,
+    height: 25,
+    marginRight: 8,
+    justifyContent: 'center',
+  },
+  cartHandle: {
+    position: 'absolute',
+    width: 8,
+    height: 3,
+    backgroundColor: '#1769aa',
+    top: 2,
+    left: 0,
+    transform: [{rotate: '15deg'}],
+  },
+  cartBasket: {
+    position: 'absolute',
+    width: 19,
+    height: 12,
+    borderWidth: 2,
+    borderColor: '#1769aa',
+    borderTopWidth: 1,
+    top: 6,
+    left: 6,
+    transform: [{skewX: '-12deg'}],
+  },
+  cartWheelRow: {
+    position: 'absolute',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: 13,
+    left: 10,
+    bottom: 0,
+  },
+  cartWheel: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#1769aa',
+  },
+  headerActionText: {
+    color: '#12466f',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  cartBadge: {
+    backgroundColor: '#e34b4b',
+    borderRadius: 12,
+    minWidth: 21,
+    height: 21,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
+  cartBadgeText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  profileHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#d4e1ed',
+    borderRadius: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+  },
+  profileSymbol: {
+    color: '#1769aa',
+    fontSize: 18,
+    marginRight: 8,
   },
   productGrid: {
     flexDirection: 'row',
@@ -2248,6 +2655,100 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 5,
+  },
+  cartItemCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e3edf6',
+    padding: 12,
+    marginVertical: 6,
+  },
+  cartItemDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cartItemImage: {
+    width: 65,
+    height: 65,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  cartItemText: {
+    flex: 1,
+  },
+  cartLineTotal: {
+    color: '#1769aa',
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  cartControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    flexWrap: 'wrap',
+  },
+  cartQtyButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 7,
+    backgroundColor: '#e7f1fb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartQtyButtonText: {
+    color: '#12466f',
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  cartQtyNumber: {
+    minWidth: 35,
+    textAlign: 'center',
+    color: '#20384f',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  removeCartButton: {
+    marginLeft: 12,
+    padding: 8,
+    backgroundColor: '#fff0f0',
+    borderRadius: 7,
+  },
+  removeCartText: {
+    color: '#b42318',
+    fontWeight: 'bold',
+  },
+  dividerLine: {
+    height: 1,
+    backgroundColor: '#d4e1ed',
+    marginVertical: 16,
+  },
+  alternateAddressToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  toggleSquare: {
+    width: 23,
+    height: 23,
+    borderWidth: 1,
+    borderColor: '#8193a5',
+    borderRadius: 5,
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleSquareSelected: {
+    backgroundColor: '#1769aa',
+    borderColor: '#1769aa',
+  },
+  toggleTick: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  multilineInput: {
+    minHeight: 75,
+    textAlignVertical: 'top',
   },
   productImage: {
     width: 76,
@@ -2448,4 +2949,4 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 });
-                   
+
