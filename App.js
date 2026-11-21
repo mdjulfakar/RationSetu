@@ -717,8 +717,6 @@ export default function App() {
           </TouchableOpacity>
 
           <View style={styles.headerBrandCenter}>
-            <Text style={styles.homeBrand}>राशन सेतु</Text>
-          </View>
 
           <TouchableOpacity
             style={styles.homeIconButton}
