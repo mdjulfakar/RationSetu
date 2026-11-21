@@ -2604,9 +2604,8 @@ headerBrandCenter: {
  cartHeaderButton: {
   flexDirection: 'row',
   alignItems: 'center',
-  backgroundColor: '#fff',
-  borderWidth: 1,
-  borderColor: '#d4e1ed',
+   backgroundColor: 'transparent',
+borderWidth: 0,
   borderRadius: 9,
   paddingHorizontal: 7,
   paddingVertical: 7,
@@ -2675,9 +2674,8 @@ cartIconShape: {
   profileHeaderButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#d4e1ed',
+    backgroundColor: 'transparent',
+borderWidth: 0,
     borderRadius: 10,
     paddingHorizontal: 13,
     paddingVertical: 10,
