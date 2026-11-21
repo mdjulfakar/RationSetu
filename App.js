@@ -716,8 +716,6 @@ export default function App() {
             )}
           </TouchableOpacity>
 
-          <View style={styles.headerBrandCenter}>
-
           <TouchableOpacity
             style={styles.homeIconButton}
             onPress={() => setScreen('profile')}
