@@ -420,7 +420,12 @@ export default function App() {
   });
 
   const [screen, setScreen] = useState('home');
+  const [showSplash, setShowSplash] = useState(true);
   const [language, setLanguage] = useState('hi');
+  useEffect(() => {
+    const splashTimer = setTimeout(() => setShowSplash(false), 1800);
+    return () => clearTimeout(splashTimer);
+  }, []);
   const t = key =>
     translations[language]?.[key] || translations.hi[key] || key;
 
@@ -689,12 +694,13 @@ export default function App() {
 
 
   const header = (
-    <View style={styles.header}>
+    <View style={screen === 'home' ? styles.homeHeader : styles.header}>
       {screen === 'home' ? (
         <View style={styles.headerTopRow}>
           <TouchableOpacity
-            style={styles.cartHeaderButton}
-            onPress={() => setScreen('cart')}>
+            style={styles.homeIconButton}
+            onPress={() => setScreen('cart')}
+            accessibilityLabel={language === 'en' ? 'Cart' : 'कार्ट'}>
             <View style={styles.cartIconShape}>
               <View style={styles.cartHandle} />
               <View style={styles.cartBasket} />
@@ -703,9 +709,6 @@ export default function App() {
                 <View style={styles.cartWheel} />
               </View>
             </View>
-            <Text style={styles.headerActionText}>
-              {language === 'en' ? 'Cart' : 'कार्ट'}
-            </Text>
             {cartCount > 0 && (
               <View style={styles.cartBadge}>
                 <Text style={styles.cartBadgeText}>{cartCount}</Text>
@@ -714,31 +717,31 @@ export default function App() {
           </TouchableOpacity>
 
           <View style={styles.headerBrandCenter}>
-            <Text style={styles.brand}>RationSetu</Text>
-            <Text style={styles.sub}>{t('tagline')}</Text>
+            <Text style={styles.homeBrand}>राशन सेतु</Text>
           </View>
 
           <TouchableOpacity
-            style={styles.profileHeaderButton}
-            onPress={() => setScreen('profile')}>
-            <Text style={styles.profileSymbol}>●</Text>
-            <Text style={styles.headerActionText}>
-              {language === 'en' ? 'Profile' : 'प्रोफाइल'}
-            </Text>
+            style={styles.homeIconButton}
+            onPress={() => setScreen('profile')}
+            accessibilityLabel={language === 'en' ? 'Profile' : 'प्रोफाइल'}>
+            <View style={styles.profileIcon}>
+              <View style={styles.profileHead} />
+              <View style={styles.profileBody} />
+            </View>
           </TouchableOpacity>
         </View>
       ) : (
         <>
           <Text style={styles.brand}>RationSetu</Text>
           <Text style={styles.sub}>{t('tagline')}</Text>
+          <Text style={styles.connection}>
+            {isOnline ? t('online') : t('offline')}
+          </Text>
         </>
       )}
-      <Text style={styles.connection}>
-        {isOnline ? t('online') : t('offline')}
-      </Text>
     </View>
   );
- function changeQuantity(id, difference) {
+function changeQuantity(id, difference) {
     const product = data.products.find(item => item.id === id);
     if (!product) return;
 
@@ -794,9 +797,7 @@ export default function App() {
       } catch (error) {
         Alert.alert(t('updateFailed'), error.message);
       }
-    }
-
-    async function getCustomerLocation() {
+    }    async function getCustomerLocation() {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
         throw new Error(
@@ -1059,7 +1060,7 @@ export default function App() {
       setLoading(true);
 
       try {
-        
+
 let customerLocation;
 
 if (useAlternateAddress) {
@@ -1594,8 +1595,7 @@ if (useAlternateAddress) {
 
     Alert.alert(t('success'), t('productAdded'));
   } catch (error) {
-    Alert.alert(t('productAddFailed'), error.message);
-  } finally {
+    Alert.alert(t('productAddFailed'), error.message);   } finally {
     setLoading(false);
   }
 }
@@ -1731,16 +1731,45 @@ function callSupport() {
   );
 }
 
+if (showSplash) {
+  return (
+    <View style={styles.splash}>
+      <View style={styles.splashLogo}>
+        <Text style={styles.splashHindi}>राशन सेतु</Text>
+      </View>
+      <Text style={styles.splashEnglish}>RationSetu</Text>
+    </View>
+  );
+}
+
 return (
-  <SafeAreaView style={styles.safe}>
+  <SafeAreaView style={[styles.safe, screen === 'home' && styles.homeSafe]}>
     {header}
 
     {screen !== 'login' && (
-      <View style={styles.nav}>
-        {button(t('home'), () => setScreen('home'))}
-        {button(t('myOrders'), () => setScreen('myorders'))}
-        
-      </View>
+      screen === 'home' ? (
+        <View style={styles.homeNav}>
+          <TouchableOpacity
+            style={styles.homeNavButton}
+            onPress={() => setScreen('home')}>
+            <Text style={styles.homeNavText}>
+              {language === 'en' ? 'Home' : 'होम'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.homeNavButton}
+            onPress={() => setScreen('myorders')}>
+            <Text style={styles.homeNavText}>
+              {language === 'en' ? 'My Orders' : 'मेरे ऑर्डर'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.nav}>
+          {button(t('home'), () => setScreen('home'))}
+          {button(t('myOrders'), () => setScreen('myorders'))}
+        </View>
+      )
     )}
 
     {cancellationOrder ? (
@@ -1772,15 +1801,30 @@ return (
 
     {screen === 'home' && (
       <ScrollView style={styles.body}>
+        <View style={styles.homeStatusRow}>
+          <View style={styles.homeStatusBar} />
+          <Text style={styles.homeStatusText}>
+            {isOnline
+              ? (language === 'en' ? 'Online' : 'ऑनलाइन')
+              : (language === 'en' ? 'Offline' : 'ऑफलाइन')}
+          </Text>
+        </View>
 
-        <Text style={styles.title}>{t('orderTitle')}</Text>
-        <Text style={styles.muted}>{t('serviceArea')}</Text>
+        <Text style={styles.homeOrderTitle}>
+          {language === 'en' ? 'Order Groceries' : 'राशन ऑर्डर करें'}
+        </Text>
 
         {apiError ? (
           <Text style={styles.errorText}>{apiError}</Text>
         ) : null}
 
         {field(search, setSearch, t('search'))}
+
+        <Text style={styles.serviceAreaText}>
+          {language === 'en'
+            ? 'Service area: 15 kilometers'
+            : 'सेवा क्षेत्र: 15 किलोमीटर'}
+        </Text>
 
         {offers
           .filter(offer => offer.is_active === true)
@@ -2349,9 +2393,7 @@ return (
 
     {data.orders.length === 0 && (
       <Text style={styles.muted}>{t('noOrders')}</Text>
-    )}
-
-    <Text style={styles.title}>{t('offers')}</Text>
+    )}    <Text style={styles.title}>{t('offers')}</Text>
     <Text style={styles.editLabel}>
       {editingOfferId ? t('editOffer') : t('addOffer')}
     </Text>
@@ -2520,11 +2562,129 @@ return (
 }
 
 const styles = StyleSheet.create({
+  splash: {
+    flex: 1,
+    backgroundColor: '#1769D2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splashLogo: {
+    width: 142,
+    height: 142,
+    borderRadius: 71,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splashHindi: {
+    color: '#1769D2',
+    fontSize: 25,
+    fontWeight: 'bold',
+  },
+  splashEnglish: {
+    color: '#FFFFFF',
+    fontSize: 21,
+    fontWeight: 'bold',
+    marginTop: 14,
+  },
+  homeSafe: {
+    backgroundColor: '#FFFFFF',
+  },
+  homeHeader: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingTop: 7,
+    paddingBottom: 5,
+  },
+  homeBrand: {
+    color: '#111111',
+    fontSize: 19,
+    fontWeight: 'bold',
+  },
+  homeIconButton: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  profileIcon: {
+    width: 25,
+    height: 25,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  profileHead: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#111111',
+    position: 'absolute',
+    top: 1,
+  },
+  profileBody: {
+    width: 20,
+    height: 12,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    backgroundColor: '#111111',
+  },
+  homeNav: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    backgroundColor: '#FFFFFF',
+  },
+  homeNavButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: '#E3E3E3',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  homeNavText: {
+    color: '#111111',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  homeStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 9,
+  },
+  homeStatusBar: {
+    width: 16,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#1685E8',
+    marginRight: 6,
+  },
+  homeStatusText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  homeOrderTitle: {
+    color: '#111111',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 7,
+  },
+  serviceAreaText: {
+    color: '#111111',
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 7,
+  },
   safe: {
     flex: 1,
     backgroundColor: '#f3f7fc',
   },
-  
+
 header: {
   backgroundColor: '#1769aa',
   minHeight: 112,
@@ -2621,7 +2781,7 @@ cartIconShape: {
     position: 'absolute',
     width: 8,
     height: 3,
-    backgroundColor: '#1769aa',
+    backgroundColor: '#111111',
     top: 2,
     left: 0,
     transform: [{rotate: '15deg'}],
@@ -2631,7 +2791,7 @@ cartIconShape: {
     width: 19,
     height: 12,
     borderWidth: 2,
-    borderColor: '#1769aa',
+    borderColor: '#111111',
     borderTopWidth: 1,
     top: 6,
     left: 6,
@@ -2649,7 +2809,7 @@ cartIconShape: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#1769aa',
+    backgroundColor: '#111111',
   },
   headerActionText: {
     color: '#12466f',
@@ -2719,18 +2879,18 @@ borderWidth: 0,
   productGridName: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: '#20384f',
+    color: '#111111',
     minHeight: 34,
   },
   productGridPrice: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#1769aa',
+    color: '#111111',
     marginTop: 4,
   },
   productGridStock: {
     fontSize: 11,
-    color: '#617487',
+    color: '#111111',
     marginTop: 3,
   },
   productGridQty: {
@@ -3031,4 +3191,4 @@ borderWidth: 0,
     textAlign: 'center',
     marginTop: 8,
   },
-});
+}); 
