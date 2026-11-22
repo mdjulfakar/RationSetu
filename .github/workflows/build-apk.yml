@@ -1,5 +1,5 @@
 
-name: Build RationSetu Release AAB
+name: Build RationSetu Release APK
 
 on:
   workflow_dispatch:
@@ -32,122 +32,16 @@ jobs:
       - name: Generate Android Project
         run: npx expo prebuild --platform android --no-install
 
-      - name: Validate Signing Secrets
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      - name: Build Release APK
         run: |
-          set -euo pipefail
-          test -n "$ANDROID_KEYSTORE_BASE64"
-          test -n "$ANDROID_KEYSTORE_PASSWORD"
-          test -n "$ANDROID_KEY_PASSWORD"
-          test -n "$ANDROID_KEY_ALIAS"
-
-      - name: Configure Release Signing
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/rationsetu-upload-key.jks
-          test -s android/app/rationsetu-upload-key.jks
-
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          path = Path("android/app/build.gradle")
-          source = path.read_text()
-
-          def locate_block(text, name, start=0, end=None):
-              if end is None:
-                  end = len(text)
-              match = re.search(r'\b' + re.escape(name) + r'\s*\{', text[start:end])
-              if not match:
-                  return None
-              opening = start + match.end() - 1
-              depth = 0
-              for i in range(opening, end):
-                  if text[i] == "{":
-                      depth += 1
-                  elif text[i] == "}":
-                      depth -= 1
-                      if depth == 0:
-                          return opening, i
-              raise RuntimeError("Unclosed Gradle block: " + name)
-
-          android = locate_block(source, "android")
-          if not android:
-              raise RuntimeError("Android Gradle block not found")
-
-          a_open, a_close = android
-          signing = locate_block(source, "signingConfigs", a_open, a_close)
-
-          release_signing = """
-              release {
-                  storeFile file("rationsetu-upload-key.jks")
-                  storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                  keyAlias System.getenv("ANDROID_KEY_ALIAS")
-                  keyPassword System.getenv("ANDROID_KEY_PASSWORD")
-              }
-          """
-
-          if signing:
-              s_open, s_close = signing
-              existing_release = locate_block(source, "release", s_open, s_close)
-              if not existing_release:
-                  source = source[:s_close] + release_signing + "\n" + source[s_close:]
-          else:
-              source = source[:a_open + 1] + "\n    signingConfigs {\n" + release_signing + "\n    }\n" + source[a_open + 1:]
-
-          android = locate_block(source, "android")
-          a_open, a_close = android
-          build_types = locate_block(source, "buildTypes", a_open, a_close)
-
-          if not build_types:
-              raise RuntimeError("buildTypes block not found")
-
-          b_open, b_close = build_types
-          release = locate_block(source, "release", b_open, b_close)
-
-          if not release:
-              raise RuntimeError("Release build type not found")
-
-          r_open, r_close = release
-          release_text = source[r_open:r_close + 1]
-
-          if re.search(r'signingConfig\s+signingConfigs\.\w+', release_text):
-              release_text = re.sub(
-                  r'signingConfig\s+signingConfigs\.\w+',
-                  'signingConfig signingConfigs.release',
-                  release_text,
-                  count=1
-              )
-          else:
-              release_text = release_text[:-1] + "\n            signingConfig signingConfigs.release\n        }"
-
-          source = source[:r_open] + release_text + source[r_close + 1:]
-          path.write_text(source)
-          print("Release signing configured.")
-          PY
-
-      - name: Build Release AAB
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-        run: |
-          set -euo pipefail
           cd android
           chmod +x gradlew
-          ./gradlew bundleRelease
+          ./gradlew assembleRelease
 
-      - name: Upload Release AAB
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: RationSetu-Release-AAB
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: RationSetu-Release-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
