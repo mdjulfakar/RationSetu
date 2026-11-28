@@ -3,12 +3,13 @@
   "expo": {
     "name": "RationSetu",
     "slug": "rationsetu",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/RationSetu_App_Icon.png",
     "android": {
       "package": "in.rationsetu.app",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/RationSetu_App_Icon.png",
         "backgroundColor": "#FFFFFF"
@@ -26,5 +27,4 @@
     ]
   }
 }
-
 
